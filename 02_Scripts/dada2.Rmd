@@ -1,0 +1,85 @@
+---
+title: "Bacterioma y fungoma en *Phaseolus vulgaris*"
+author: "Samuel Solís Barrón"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    number_sections: true
+    code_folding: show
+    theme: cosmo
+    highlight: github
+  pdf_document:
+    toc: true
+    toc_depth: 4
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(comment = "#>", collapse = TRUE, warning = FALSE,
+                      message = FALSE)
+set.seed(123)
+```
+
+---
+
+# Instalación de paquetes
+
+```{r install-pkgs, eval=FALSE}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+BiocManager::install(version = "3.23")
+
+BiocManager::install(c("dada2", "ShortRead", "Biostrings",
+                        "phyloseq", "DESeq2"), force = TRUE)
+
+install.packages(c("ggplot2", "vegan", "scales",
+                   "RColorBrewer", "ggpubr", "knitr"))
+```
+
+# Carga de paquetes
+
+```{r load-pkgs}
+library(dada2)
+library(ShortRead)
+library(DESeq2)
+library(Biostrings)
+library(phyloseq)
+library(vegan)
+library(ggplot2)
+library(RColorBrewer)
+library(ggpubr)
+library(scales)
+library(knitr)
+```
+
+---
+
+# Metadatos del SRA
+
+Los metadatos describen las muestras descargadas del SRA para ambos amplicones (16S bacterioma e ITS/18S fungoma).
+
+```{r metadata}
+metadata16S <- read.csv("01_RawData/csv/16S/SraRunTable16S.csv",
+                        stringsAsFactors = FALSE)
+metadataITS <- read.csv("01_RawData/csv/ITS/SraRunTableITS.csv",
+                        stringsAsFactors = FALSE)
+
+# Marcar el amplicon y unir
+metadata16S$amplicon <- "16S"
+metadataITS$amplicon <- "ITS"
+metadata <- rbind(metadata16S, metadataITS)
+
+cat("Muestras 16S:", sum(metadata$amplicon == "16S"), "\n")
+cat("Muestras ITS:", sum(metadata$amplicon == "ITS"),  "\n")
+head(metadata)
+
+write.csv(metadata, "03_Results/csv/metadata/metadata.csv")
+
+# Filtrar la lista de SRR al amplicon seleccionado
+srr <- metadata$Run[metadata$amplicon == "16S"]
+```
+
