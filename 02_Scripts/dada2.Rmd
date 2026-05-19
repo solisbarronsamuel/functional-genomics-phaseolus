@@ -226,6 +226,12 @@ get.sample.name <- function(fname) strsplit(basename(fname), "_")[[1]][1]
 sample.names16S <- unname(sapply(cutFs16S, get.sample.name))
 head(sample.names16S)
 
+saveRDS(cutFs16S, file = "03_Results/rds/16S/cutFs16S.RDS")
+saveRDS(cutRs16s, file = "03_Results/rds/16S/cutRs16S.RDS")
+
+cutFs16S <- readRDS("03_Results/rds/16S/cutFs16S.RDS")
+cutRs16s <- readRDS("03_Results/rds/16S/cutRs16S.RDS")
+
 ```
 
 ### 18S rRNA — V4 (FW 5′-CCAGCASCYGCGGTAATTCC-3′ / RV 5′-ACTTTCGTTCTTGATYRA-3′)
@@ -300,6 +306,13 @@ cutRs18S <- sort(list.files(path.cut.18S, pattern = "_2.fastq", full.names = TRU
 
 sample.names18S <- unname(sapply(cutFs18S, get.sample.name))
 head(sample.names18S)
+
+saveRDS(cutFs16S, file = "03_Results/rds/16S/cutFsITS.RDS")
+saveRDS(cutRs16s, file = "03_Results/rds/ITS/cutRsITS.RDS")
+
+cutFs16S <- readRDS("03_Results/rds/16S/cutFsITS.RDS")
+cutRs16s <- readRDS("03_Results/rds/16S/cutRsITS.RDS")
+
 ```
 
 ## Verificación de calidad PHRED
@@ -372,22 +385,22 @@ saveRDS(asvITS, file = "03_Results/rds/ITS/asvITS.RDS")
 
 ```{r learn-errors}
 # 16S
-# errF16S <- readRDS("03_Results/rds/16S/errF16S.RDS")
-errF16S <- learnErrors(filtFs16S, multithread = TRUE)
+errF16S <- readRDS("03_Results/rds/16S/errF16S.RDS")
+# errF16S <- learnErrors(filtFs16S, multithread = TRUE)
 # saveRDS(errF16S, file = "03_Results/rds/16S/errF16S.RDS")
 
-# errR16S <- readRDS("03_Results/rds/16S/errR16S.RDS")
-errR16S <- learnErrors(filtRs16S, multithread = TRUE)
+errR16S <- readRDS("03_Results/rds/16S/errR16S.RDS")
+# errR16S <- learnErrors(filtRs16S, multithread = TRUE)
 # saveRDS(errR16S, file = "03_Results/rds/16S/errR16S.RDS")
 
 # ITS / 18S
-#errFITS <- readRDS("03_Results/rds/ITS/errFITS.RDS")
-errFITS <- learnErrors(filtFsITS, multithread = TRUE)
+errFITS <- readRDS("03_Results/rds/ITS/errFITS.RDS")
+# errFITS <- learnErrors(filtFsITS, multithread = TRUE)
 # saveRDS(errFITS, file = "03_Results/rds/ITS/errFITS.RDS")
 
-#errRITS <- readRDS("03_Results/rds/ITS/errRITS.RDS")
-errRITS <- learnErrors(filtRsITS, multithread = TRUE)
-#saveRDS(errRITS, file = "03_Results/rds/ITS/errRITS.RDS")
+errRITS <- readRDS("03_Results/rds/ITS/errRITS.RDS")
+# errRITS <- learnErrors(filtRsITS, multithread = TRUE)
+# saveRDS(errRITS, file = "03_Results/rds/ITS/errRITS.RDS")
 
 # Graficar modelos de error
 png("03_Results/figures/16S/errores-forward-16S.png")
@@ -410,11 +423,11 @@ dev.off()
 ## Inferencia de ASVs y fusión de pares
 
 ```{r dada-merge}
-dadaFs16S <- dada(filtFs16S, err = errF16S, multithread = FALSE)
-dadaRs16S <- dada(filtRs16S, err = errR16S, multithread = FALSE)
+dadaFs16S <- dada(filtFs16S, err = errF16S, multithread = TRUE)
+dadaRs16S <- dada(filtRs16S, err = errR16S, multithread = TRUE)
 
-dadaFsITS <- dada(filtFsITS, err = errFITS, multithread = FALSE)
-dadaRsITS <- dada(filtRsITS, err = errRITS, multithread = FALSE)
+dadaFsITS <- dada(filtFsITS, err = errFITS, multithread = TRUE)
+dadaRsITS <- dada(filtRsITS, err = errRITS, multithread = TRUE)
 
 mergers16S <- mergePairs(dadaFs16S, filtFs16S, dadaRs16S, filtRs16S, verbose = TRUE)
 saveRDS(mergers16S, file = "03_Results/rds/16S/mergers16S.RDS")
