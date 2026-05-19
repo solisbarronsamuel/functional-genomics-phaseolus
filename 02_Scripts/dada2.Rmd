@@ -83,3 +83,224 @@ write.csv(metadata, "03_Results/csv/metadata/metadata.csv")
 srr <- metadata$Run[metadata$amplicon == "16S"]
 ```
 
+
+## DADA2
+
+Preparar rutas de archivos FASTQ:
+
+```{r fastq-paths}
+# Construir rutas a los archivos FASTQ comprimidos
+path16S <- "01_RawData/fastq/16S/"
+list.files(path16S)
+
+pathITS <- "01_RawData/fastq/ITS/"
+list.files(pathITS)
+
+fnFs16S <- sort(list.files(path16S, pattern = "_1.fastq", full.names = TRUE))
+fnRs16S <- sort(list.files(path16S, pattern = "_2.fastq", full.names = TRUE))
+
+fnFsITS <- sort(list.files(pathITS, pattern = "_1.fastq", full.names = TRUE))
+fnRsITS <- sort(list.files(pathITS, pattern = "_2.fastq", full.names = TRUE))
+
+# Excluir los grupos control
+remove_ids <- c(
+  "SRR25070675",   # 16S controls / parentals
+  "SRR25070676",
+  "SRR25100830",   # ITS controls / parentals
+  "SRR25100831"
+)
+
+patron <- paste(remove_ids, collapse = "|")
+
+fnFs16S <- fnFs16S[!grepl(patron, fnFs16S)]
+fnRs16S <- fnRs16S[!grepl(patron, fnRs16S)]
+
+fnFsITS <- fnFsITS[!grepl(patron, fnFsITS)]
+fnRsITS <- fnRsITS[!grepl(patron, fnRsITS)]
+
+samples.names16S <- sapply(strsplit(basename(fnFs16S), "_"), `[`, 1)
+samples.namesITS <- sapply(strsplit(basename(fnFsITS), "_"), `[`, 1)
+
+cat("Muestras 16S:", length(samples.names16S), "\n")
+cat("Muestras ITS:", length(samples.namesITS),  "\n")
+
+samples.names16S
+samples.namesITS
+```
+
+## Eliminación de primers con Cutadapt
+
+Se amplificaron dos regiones ribosomales: la región **V4-V5 del 16S rRNA** (bacterias y arqueas, primers 515F/926R) y la región **V4 del 18S rRNA** (eucariotas, ITS). A continuación se eliminan los primers de ambos conjuntos de lecturas usando Cutadapt.
+
+### 16S rRNA — V4-V5 (515F / 926R)
+
+Definir primers y sus orientaciones:
+
+```{r primers-16S}
+# Primers 16S V4-V5 (515F / 926R)
+FWD.16S <- "GTGYCAGCMGCCGCGGTAA"   # 515F
+REV.16S <- "CCGYCAATTYMTTTRAGTTT"  # 926R
+
+allOrients <- function(primer) {
+  require(Biostrings)
+  dna     <- DNAString(primer)
+  orients <- c(
+    Forward    = dna,
+    Complement = Biostrings::complement(dna),
+    Reverse    = Biostrings::reverse(dna),
+    RevComp    = Biostrings::reverseComplement(dna)
+  )
+  return(sapply(orients, toString))
+}
+
+FWD.orients.16S <- allOrients(FWD.16S)
+REV.orients.16S <- allOrients(REV.16S)
+FWD.orients.16S
+```
+
+Filtrar Ns y verificar hits de primers {-}
+
+```{r filtN-hits-16S}
+# Rutas para lecturas filtradas de Ns
+fnFs16S.filtN <- file.path(path16S, "filtN", basename(fnFs16S))
+fnRs16S.filtN <- file.path(path16S, "filtN", basename(fnRs16S))
+
+filterAndTrim(fnFs16S, fnFs16S.filtN,
+              fnRs16S, fnRs16S.filtN,
+              maxN = 0, multithread = TRUE)  # FALSE en Windows
+
+# Función para contar hits de primer en un archivo FASTQ
+primerHits <- function(primer, fn) {
+  nhits <- vcountPattern(primer, sread(readFastq(fn)), fixed = FALSE)
+  return(sum(nhits > 0))
+}
+
+# Verificar presencia de primers antes de cortar
+rbind(
+  FWD.ForwardReads = sapply(FWD.orients.16S, primerHits, fn = fnFs16S.filtN[[1]]),
+  FWD.ReverseReads = sapply(FWD.orients.16S, primerHits, fn = fnRs16S.filtN[[1]]),
+  REV.ForwardReads = sapply(REV.orients.16S, primerHits, fn = fnFs16S.filtN[[1]]),
+  REV.ReverseReads = sapply(REV.orients.16S, primerHits, fn = fnRs16S.filtN[[1]])
+)
+```
+
+#### Chunk 3 — Cortar primers con Cutadapt y verificar {-}
+
+```{r cutadapt-16S}
+cutadapt <- "/usr/local/bin/cutadapt"  # CAMBIAR a la ruta de cutadapt en tu máquina
+system2(cutadapt, args = "--version")
+
+path.cut.16S <- file.path(path16S, "cutadapt")
+if (!dir.exists(path.cut.16S)) dir.create(path.cut.16S)
+
+fnFs16S.cut <- file.path(path.cut.16S, basename(fnFs16S))
+fnRs16S.cut <- file.path(path.cut.16S, basename(fnRs16S))
+
+FWD.RC.16S <- dada2:::rc(FWD.16S)
+REV.RC.16S <- dada2:::rc(REV.16S)
+
+# Flags: recortar FWD y RC(REV) de R1; REV y RC(FWD) de R2
+R1.flags.16S <- paste("-g", FWD.16S, "-a", REV.RC.16S)
+R2.flags.16S <- paste("-G", REV.16S, "-A", FWD.RC.16S)
+
+for (i in seq_along(fnFs16S)) {
+  system2(cutadapt,
+          args = c(R1.flags.16S, R2.flags.16S,
+                   "-n", 2,
+                   "-o", fnFs16S.cut[i],
+                   "-p", fnRs16S.cut[i],
+                   fnFs16S.filtN[i], fnRs16S.filtN[i]))
+}
+
+# Verificar que los primers fueron eliminados
+rbind(
+  FWD.ForwardReads = sapply(FWD.orients.16S, primerHits, fn = fnFs16S.cut[[1]]),
+  FWD.ReverseReads = sapply(FWD.orients.16S, primerHits, fn = fnRs16S.cut[[1]]),
+  REV.ForwardReads = sapply(REV.orients.16S, primerHits, fn = fnFs16S.cut[[1]]),
+  REV.ReverseReads = sapply(REV.orients.16S, primerHits, fn = fnRs16S.cut[[1]])
+)
+
+# Actualizar rutas para el pipeline de DADA2
+cutFs16S <- sort(list.files(path.cut.16S, pattern = "_1.fastq.gz", full.names = TRUE))
+cutRs16S <- sort(list.files(path.cut.16S, pattern = "_2.fastq.gz", full.names = TRUE))
+
+get.sample.name <- function(fname) strsplit(basename(fname), "_")[[1]][1]
+sample.names16S <- unname(sapply(cutFs16S, get.sample.name))
+head(sample.names16S)
+```
+
+---
+
+### 18S rRNA — V4 (FW 5′-CCAGCASCYGCGGTAATTCC-3′ / RV 5′-ACTTTCGTTCTTGATYRA-3′)
+
+#### Chunk 1 — Definir primers y sus orientaciones {-}
+
+```{r primers-18S}
+# Primers 18S V4
+FWD.18S <- "CCAGCASCYGCGGTAATTCC"  # Forward V4-18S
+REV.18S <- "ACTTTCGTTCTTGATYRA"    # Reverse V4-18S
+
+FWD.orients.18S <- allOrients(FWD.18S)
+REV.orients.18S <- allOrients(REV.18S)
+FWD.orients.18S
+```
+
+#### Chunk 2 — Filtrar Ns y verificar hits de primers {-}
+
+```{r filtN-hits-18S}
+# Rutas para lecturas filtradas de Ns
+fnFs18S.filtN <- file.path(pathITS, "filtN", basename(fnFsITS))
+fnRs18S.filtN <- file.path(pathITS, "filtN", basename(fnRsITS))
+
+filterAndTrim(fnFsITS, fnFs18S.filtN,
+              fnRsITS, fnRs18S.filtN,
+              maxN = 0, multithread = FALSE)  # FALSE en Windows
+
+# Verificar presencia de primers antes de cortar
+rbind(
+  FWD.ForwardReads = sapply(FWD.orients.18S, primerHits, fn = fnFs18S.filtN[[1]]),
+  FWD.ReverseReads = sapply(FWD.orients.18S, primerHits, fn = fnRs18S.filtN[[1]]),
+  REV.ForwardReads = sapply(REV.orients.18S, primerHits, fn = fnFs18S.filtN[[1]]),
+  REV.ReverseReads = sapply(REV.orients.18S, primerHits, fn = fnRs18S.filtN[[1]])
+)
+```
+
+#### Chunk 3 — Cortar primers con Cutadapt y verificar {-}
+
+```{r cutadapt-18S}
+path.cut.18S <- file.path(pathITS, "cutadapt")
+if (!dir.exists(path.cut.18S)) dir.create(path.cut.18S)
+
+fnFs18S.cut <- file.path(path.cut.18S, basename(fnFsITS))
+fnRs18S.cut <- file.path(path.cut.18S, basename(fnRsITS))
+
+FWD.RC.18S <- dada2:::rc(FWD.18S)
+REV.RC.18S <- dada2:::rc(REV.18S)
+
+R1.flags.18S <- paste("-g", FWD.18S, "-a", REV.RC.18S)
+R2.flags.18S <- paste("-G", REV.18S, "-A", FWD.RC.18S)
+
+for (i in seq_along(fnFsITS)) {
+  system2(cutadapt,
+          args = c(R1.flags.18S, R2.flags.18S,
+                   "-n", 2,
+                   "-o", fnFs18S.cut[i],
+                   "-p", fnRs18S.cut[i],
+                   fnFs18S.filtN[i], fnRs18S.filtN[i]))
+}
+
+# Verificar que los primers fueron eliminados
+rbind(
+  FWD.ForwardReads = sapply(FWD.orients.18S, primerHits, fn = fnFs18S.cut[[1]]),
+  FWD.ReverseReads = sapply(FWD.orients.18S, primerHits, fn = fnRs18S.cut[[1]]),
+  REV.ForwardReads = sapply(REV.orients.18S, primerHits, fn = fnFs18S.cut[[1]]),
+  REV.ReverseReads = sapply(REV.orients.18S, primerHits, fn = fnRs18S.cut[[1]])
+)
+
+# Actualizar rutas para el pipeline de DADA2
+cutFs18S <- sort(list.files(path.cut.18S, pattern = "_1.fastq.gz", full.names = TRUE))
+cutRs18S <- sort(list.files(path.cut.18S, pattern = "_2.fastq.gz", full.names = TRUE))
+
+sample.names18S <- unname(sapply(cutFs18S, get.sample.name))
+head(sample.names18S)
+```
