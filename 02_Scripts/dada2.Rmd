@@ -56,8 +56,6 @@ library(scales)
 library(knitr)
 ```
 
----
-
 # Metadatos del SRA
 
 Los metadatos describen las muestras descargadas del SRA para ambos amplicones (16S bacterioma e ITS/18S fungoma).
@@ -158,7 +156,7 @@ REV.orients.16S <- allOrients(REV.16S)
 FWD.orients.16S
 ```
 
-Filtrar Ns y verificar hits de primers {-}
+Filtrar Ns y verificar hits de primers:
 
 ```{r filtN-hits-16S}
 # Rutas para lecturas filtradas de Ns
@@ -184,10 +182,10 @@ rbind(
 )
 ```
 
-#### Chunk 3 — Cortar primers con Cutadapt y verificar {-}
+Cortar primers con Cutadapt y verificar:
 
 ```{r cutadapt-16S}
-cutadapt <- "/usr/local/bin/cutadapt"  # CAMBIAR a la ruta de cutadapt en tu máquina
+cutadapt <- "/usr/bin/cutadapt"  # CAMBIAR a la ruta de cutadapcutt en tu máquina
 system2(cutadapt, args = "--version")
 
 path.cut.16S <- file.path(path16S, "cutadapt")
@@ -221,19 +219,18 @@ rbind(
 )
 
 # Actualizar rutas para el pipeline de DADA2
-cutFs16S <- sort(list.files(path.cut.16S, pattern = "_1.fastq.gz", full.names = TRUE))
-cutRs16S <- sort(list.files(path.cut.16S, pattern = "_2.fastq.gz", full.names = TRUE))
+cutFs16S <- sort(list.files(path.cut.16S, pattern = "_1.fastq", full.names = TRUE))
+cutRs16S <- sort(list.files(path.cut.16S, pattern = "_2.fastq", full.names = TRUE))
 
 get.sample.name <- function(fname) strsplit(basename(fname), "_")[[1]][1]
 sample.names16S <- unname(sapply(cutFs16S, get.sample.name))
 head(sample.names16S)
-```
 
----
+```
 
 ### 18S rRNA — V4 (FW 5′-CCAGCASCYGCGGTAATTCC-3′ / RV 5′-ACTTTCGTTCTTGATYRA-3′)
 
-#### Chunk 1 — Definir primers y sus orientaciones {-}
+Definir primers y sus orientaciones:
 
 ```{r primers-18S}
 # Primers 18S V4
@@ -245,7 +242,7 @@ REV.orients.18S <- allOrients(REV.18S)
 FWD.orients.18S
 ```
 
-#### Chunk 2 — Filtrar Ns y verificar hits de primers {-}
+Filtrar Ns y verificar hits de primers:
 
 ```{r filtN-hits-18S}
 # Rutas para lecturas filtradas de Ns
@@ -265,7 +262,7 @@ rbind(
 )
 ```
 
-#### Chunk 3 — Cortar primers con Cutadapt y verificar {-}
+Cortar primers con Cutadapt y verificar:
 
 ```{r cutadapt-18S}
 path.cut.18S <- file.path(pathITS, "cutadapt")
@@ -298,9 +295,186 @@ rbind(
 )
 
 # Actualizar rutas para el pipeline de DADA2
-cutFs18S <- sort(list.files(path.cut.18S, pattern = "_1.fastq.gz", full.names = TRUE))
-cutRs18S <- sort(list.files(path.cut.18S, pattern = "_2.fastq.gz", full.names = TRUE))
+cutFs18S <- sort(list.files(path.cut.18S, pattern = "_1.fastq", full.names = TRUE))
+cutRs18S <- sort(list.files(path.cut.18S, pattern = "_2.fastq", full.names = TRUE))
 
 sample.names18S <- unname(sapply(cutFs18S, get.sample.name))
 head(sample.names18S)
+```
+
+## Verificación de calidad PHRED
+
+```{r phred-quality}
+pdf("03_Results/phred/16S/quality-forward-16S.pdf", width = 20, height = 12)
+plotQualityProfile(cutFs16S[1:20])
+dev.off()
+
+pdf("03_Results/phred/16S/quality-reverse-16S.pdf", width = 20, height = 12)
+plotQualityProfile(cutRs16S[1:20])
+dev.off()
+
+pdf("03_Results/phred/ITS/quality-forward-ITS.pdf", width = 20, height = 12)
+plotQualityProfile(cutFs18S[1:20])
+dev.off()
+
+pdf("03_Results/phred/ITS/quality-reverse-ITS.pdf", width = 20, height = 12)
+plotQualityProfile(cutRs18S[1:20])
+dev.off()
+```
+
+## Filtrado de calidad
+
+```{r quality-filter}
+filtFs16S <- file.path(path.cut.16S, "filtered",
+                       basename(cutFs16S))
+filtRs16S <- file.path(path.cut.16S, "filtered",
+                       basename(cutRs16S))
+
+filtFsITS <- file.path(path.cut.18S, "filtered",
+                       basename(cutFs18S))
+filtRsITS <- file.path(path.cut.18S, "filtered",
+                       basename(cutRs18S))
+
+names(filtFs16S) <- samples.names16S
+names(filtRs16S) <- samples.names16S
+names(filtFsITS) <- samples.namesITS
+names(filtRsITS) <- samples.namesITS
+
+asv16S <- filterAndTrim(
+  fnFs16S, filtFs16S,
+  fnRs16S, filtRs16S,
+  truncLen    = c(240, 160),  # ajustar según perfiles PHRED
+  maxN        = 0,
+  maxEE       = c(2, 2),
+  truncQ      = 2,
+  rm.phix     = TRUE,
+  compress    = TRUE,
+  multithread = TRUE         # FALSE en Windows
+)
+
+asvITS <- filterAndTrim(
+  fnFsITS, filtFsITS,
+  fnRsITS, filtRsITS,
+  truncLen    = c(240, 160),  # ajustar según perfiles PHRED
+  maxN        = 0,
+  maxEE       = c(2, 2),
+  truncQ      = 2,
+  rm.phix     = TRUE,
+  compress    = TRUE,
+  multithread = TRUE
+)
+
+saveRDS(asv16S, file = "03_Results/rds/16S/asv16S.RDS")
+saveRDS(asvITS, file = "03_Results/rds/ITS/asvITS.RDS")
+```
+
+## Aprendizaje de errores
+
+```{r learn-errors}
+# 16S
+# errF16S <- readRDS("03_Results/rds/16S/errF16S.RDS")
+errF16S <- learnErrors(filtFs16S, multithread = TRUE)
+# saveRDS(errF16S, file = "03_Results/rds/16S/errF16S.RDS")
+
+# errR16S <- readRDS("03_Results/rds/16S/errR16S.RDS")
+errR16S <- learnErrors(filtRs16S, multithread = TRUE)
+# saveRDS(errR16S, file = "03_Results/rds/16S/errR16S.RDS")
+
+# ITS / 18S
+#errFITS <- readRDS("03_Results/rds/ITS/errFITS.RDS")
+errFITS <- learnErrors(filtFsITS, multithread = TRUE)
+# saveRDS(errFITS, file = "03_Results/rds/ITS/errFITS.RDS")
+
+#errRITS <- readRDS("03_Results/rds/ITS/errRITS.RDS")
+errRITS <- learnErrors(filtRsITS, multithread = TRUE)
+#saveRDS(errRITS, file = "03_Results/rds/ITS/errRITS.RDS")
+
+# Graficar modelos de error
+png("03_Results/figures/16S/errores-forward-16S.png")
+plotErrors(errF16S, nominalQ = TRUE)
+dev.off()
+
+png("03_Results/figures/16S/errores-reverse-16S.png")
+plotErrors(errR16S, nominalQ = TRUE)
+dev.off()
+
+png("03_Results/figures/ITS/errores-forward-ITS.png")
+plotErrors(errFITS, nominalQ = TRUE)
+dev.off()
+
+png("03_Results/figures/ITS/errores-reverse-ITS.png")
+plotErrors(errRITS, nominalQ = TRUE)
+dev.off()
+```
+
+## Inferencia de ASVs y fusión de pares
+
+```{r dada-merge}
+dadaFs16S <- dada(filtFs16S, err = errF16S, multithread = FALSE)
+dadaRs16S <- dada(filtRs16S, err = errR16S, multithread = FALSE)
+
+dadaFsITS <- dada(filtFsITS, err = errFITS, multithread = FALSE)
+dadaRsITS <- dada(filtRsITS, err = errRITS, multithread = FALSE)
+
+mergers16S <- mergePairs(dadaFs16S, filtFs16S, dadaRs16S, filtRs16S, verbose = TRUE)
+saveRDS(mergers16S, file = "03_Results/rds/16S/mergers16S.RDS")
+seqtab16S <- makeSequenceTable(mergers16S)
+
+mergersITS <- mergePairs(dadaFsITS, filtFsITS, dadaRsITS, filtRsITS, verbose = TRUE)
+saveRDS(mergersITS, file = "03_Results/rds/ITS/mergersITS.RDS")
+seqtabITS <- makeSequenceTable(mergersITS)
+
+dim(seqtab16S)
+saveRDS(seqtab16S, file = "03_Results/rds/16S/seqtab.RDS")
+
+dim(seqtabITS)
+saveRDS(seqtabITS, file = "03_Results/rds/ITS/seqtab.RDS")
+```
+
+## Eliminación de quimeras
+
+```{r remove-chimeras}
+seqtab.nochim16S <- removeBimeraDenovo(seqtab16S, method = "consensus",
+                                        multithread = FALSE, verbose = TRUE)
+cat("Fraccion de lecturas 16S conservadas:",
+    round(sum(seqtab.nochim16S) / sum(seqtab16S), 4), "\n")
+
+seqtab.nochimITS <- removeBimeraDenovo(seqtabITS, method = "consensus",
+                                        multithread = FALSE, verbose = TRUE)
+cat("Fraccion de lecturas ITS conservadas:",
+    round(sum(seqtab.nochimITS) / sum(seqtabITS), 4), "\n")
+```
+
+## Seguimiento de lecturas por paso (track)
+
+```{r track-reads}
+getN <- function(x) sum(getUniques(x))
+
+track16S <- cbind(
+  asv16S,
+  sapply(dadaFs16S,  getN),
+  sapply(dadaRs16S,  getN),
+  sapply(mergers16S, getN),
+  rowSums(seqtab.nochim16S)
+)
+colnames(track16S) <- c("input", "filtered", "denoisedF",
+                         "denoisedR", "merged", "nonchim")
+rownames(track16S) <- samples.names16S
+
+head(track16S)
+write.csv(track16S, "03_Results/csv/16S/track16S.csv")
+
+trackITS <- cbind(
+  asvITS,
+  sapply(dadaFsITS,  getN),
+  sapply(dadaRsITS,  getN),
+  sapply(mergersITS, getN),
+  rowSums(seqtab.nochimITS)
+)
+colnames(trackITS) <- c("input", "filtered", "denoisedF",
+                         "denoisedR", "merged", "nonchim")
+rownames(trackITS) <- samples.namesITS
+
+head(trackITS)
+write.csv(trackITS, "03_Results/csv/ITS/trackITS.csv")
 ```
