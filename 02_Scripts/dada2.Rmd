@@ -34,7 +34,7 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
 BiocManager::install(version = "3.23")
 
 BiocManager::install(c("dada2", "ShortRead", "Biostrings",
-                        "phyloseq", "DESeq2"), force = TRUE)
+                        "phyloseq", "DESeq2", "DECIPHER"), force = TRUE)
 
 install.packages(c("ggplot2", "vegan", "scales",
                    "RColorBrewer", "ggpubr", "knitr"))
@@ -54,6 +54,7 @@ library(RColorBrewer)
 library(ggpubr)
 library(scales)
 library(knitr)
+library(DECIPHER)
 ```
 
 # Metadatos del SRA
@@ -124,6 +125,13 @@ cat("Muestras ITS:", length(samples.namesITS),  "\n")
 
 samples.names16S
 samples.namesITS
+
+saveRDS(samples.names16S, file = "03_Results/rds/16S/samples.names16S.RDS")
+saveRDS(samples.namesITS, file = "03_Results/rds/16S/samples.namesITS.RDS")
+
+samples.names16S <- readRDS("03_Results/rds/16S/samples.names16S.RDS")
+samples.namesITS <- readRDS("03_Results/rds/16S/samples.namesITS.RDS")
+
 ```
 
 ## Eliminación de primers con Cutadapt
@@ -227,10 +235,10 @@ sample.names16S <- unname(sapply(cutFs16S, get.sample.name))
 head(sample.names16S)
 
 saveRDS(cutFs16S, file = "03_Results/rds/16S/cutFs16S.RDS")
-saveRDS(cutRs16s, file = "03_Results/rds/16S/cutRs16S.RDS")
+saveRDS(cutRs16S, file = "03_Results/rds/16S/cutRs16S.RDS")
 
 cutFs16S <- readRDS("03_Results/rds/16S/cutFs16S.RDS")
-cutRs16s <- readRDS("03_Results/rds/16S/cutRs16S.RDS")
+cutRs16S <- readRDS("03_Results/rds/16S/cutRs16S.RDS")
 
 ```
 
@@ -307,23 +315,34 @@ cutRs18S <- sort(list.files(path.cut.18S, pattern = "_2.fastq", full.names = TRU
 sample.names18S <- unname(sapply(cutFs18S, get.sample.name))
 head(sample.names18S)
 
-saveRDS(cutFs16S, file = "03_Results/rds/16S/cutFsITS.RDS")
-saveRDS(cutRs16s, file = "03_Results/rds/ITS/cutRsITS.RDS")
+# Save — make sure both say ITS, not 18S
+saveRDS(cutFs18S, file = "03_Results/rds/ITS/cutFsITS.RDS")
+saveRDS(cutRs18S,, file = "03_Results/rds/ITS/cutRsITS.RDS")
 
-cutFs16S <- readRDS("03_Results/rds/16S/cutFsITS.RDS")
-cutRs16s <- readRDS("03_Results/rds/16S/cutRsITS.RDS")
+# Read back — same
+cutFs18S <- readRDS("03_Results/rds/ITS/cutFsITS.RDS")
+cutRs18S <- readRDS("03_Results/rds/ITS/cutRsITS.RDS")
 
 ```
 
 ## Verificación de calidad PHRED
 
 ```{r phred-quality}
+
+# Filter out empty files before plotting
+cutFs16S.nonempty <- cutFs16S[file.info(cutFs16S)$size > 50]
+cutRs16S.nonempty <- cutRs16S[file.info(cutRs16S)$size > 50]
+
+# Or count reads per file
+library(ShortRead)
+sapply(cutFs16S[1:20], function(f) length(readFastq(f)))
+
 pdf("03_Results/phred/16S/quality-forward-16S.pdf", width = 20, height = 12)
 plotQualityProfile(cutFs16S[1:20])
 dev.off()
 
 pdf("03_Results/phred/16S/quality-reverse-16S.pdf", width = 20, height = 12)
-plotQualityProfile(cutRs16S[1:20])
+plotQualityProfile(cutFs16S.nonempty[1:20])
 dev.off()
 
 pdf("03_Results/phred/ITS/quality-forward-ITS.pdf", width = 20, height = 12)
@@ -379,6 +398,9 @@ asvITS <- filterAndTrim(
 
 saveRDS(asv16S, file = "03_Results/rds/16S/asv16S.RDS")
 saveRDS(asvITS, file = "03_Results/rds/ITS/asvITS.RDS")
+
+asv16S <- readRDS("03_Results/rds/16S/asv16S.RDS")
+asvITS <- readRDS("03_Results/rds/ITS/asvITS.RDS")
 ```
 
 ## Aprendizaje de errores
@@ -429,31 +451,37 @@ dadaRs16S <- dada(filtRs16S, err = errR16S, multithread = TRUE)
 dadaFsITS <- dada(filtFsITS, err = errFITS, multithread = TRUE)
 dadaRsITS <- dada(filtRsITS, err = errRITS, multithread = TRUE)
 
-mergers16S <- mergePairs(dadaFs16S, filtFs16S, dadaRs16S, filtRs16S, verbose = TRUE)
-saveRDS(mergers16S, file = "03_Results/rds/16S/mergers16S.RDS")
+# Mezclar ambos sentidos
+
+# mergers16S <- mergePairs(dadaFs16S, filtFs16S, dadaRs16S, filtRs16S, verbose = TRUE)
+# saveRDS(mergers16S, file = "03_Results/rds/16S/mergers16S.RDS")
+mergers16S <- readRDS("03_Results/rds/16S/mergers16S.RDS")
 seqtab16S <- makeSequenceTable(mergers16S)
 
-mergersITS <- mergePairs(dadaFsITS, filtFsITS, dadaRsITS, filtRsITS, verbose = TRUE)
-saveRDS(mergersITS, file = "03_Results/rds/ITS/mergersITS.RDS")
+# mergersITS <- mergePairs(dadaFsITS, filtFsITS, dadaRsITS, filtRsITS, verbose = TRUE)
+# saveRDS(mergersITS, file = "03_Results/rds/ITS/mergersITS.RDS")
+mergersITS <- readRDS("03_Results/rds/ITS/mergersITS.RDS")
 seqtabITS <- makeSequenceTable(mergersITS)
 
-dim(seqtab16S)
-saveRDS(seqtab16S, file = "03_Results/rds/16S/seqtab.RDS")
+# dim(seqtab16S)
+# saveRDS(seqtab16S, file = "03_Results/rds/16S/seqtab16S.RDS")
+seqtab16S <- readRDS("03_Results/rds/16S/seqtab16S.RDS")
 
-dim(seqtabITS)
-saveRDS(seqtabITS, file = "03_Results/rds/ITS/seqtab.RDS")
+# dim(seqtabITS)
+# saveRDS(seqtabITS, file = "03_Results/rds/ITS/seqtabITS.RDS")
+seqtabITS <- readRDS("03_Results/rds/ITS/seqtabITS.RDS")
 ```
 
 ## Eliminación de quimeras
 
 ```{r remove-chimeras}
 seqtab.nochim16S <- removeBimeraDenovo(seqtab16S, method = "consensus",
-                                        multithread = FALSE, verbose = TRUE)
+                                        multithread = TRUE, verbose = TRUE)
 cat("Fraccion de lecturas 16S conservadas:",
     round(sum(seqtab.nochim16S) / sum(seqtab16S), 4), "\n")
 
 seqtab.nochimITS <- removeBimeraDenovo(seqtabITS, method = "consensus",
-                                        multithread = FALSE, verbose = TRUE)
+                                        multithread = TRUE, verbose = TRUE)
 cat("Fraccion de lecturas ITS conservadas:",
     round(sum(seqtab.nochimITS) / sum(seqtabITS), 4), "\n")
 ```
@@ -490,4 +518,196 @@ rownames(trackITS) <- samples.namesITS
 
 head(trackITS)
 write.csv(trackITS, "03_Results/csv/ITS/trackITS.csv")
+```
+
+## Asignación taxonómica
+
+```{r assign-taxonomy}
+# 16S — SILVA
+taxa16S <- assignTaxonomy(seqtab.nochim16S,
+                           "01_RawData/silva/silva_nr99_v138.1_train_set.fa.gz",
+                           multithread = TRUE)
+taxa16S <- addSpecies(taxa16S,
+                       "01_RawData/silva/silva_species_assignment_v138.1.fa.gz")
+
+saveRDS(taxa16S, file = "03_Results/rds/16S/taxa16S.RDS")
+
+taxa16S.print <- taxa16S
+rownames(taxa16S.print) <- NULL
+head(taxa16S.print)
+
+# ITS — UNITE (descargar de https://unite.ut.ee/repository.php)
+taxa_ITS <- assignTaxonomy(seqtab.nochimITS,
+                             "01_RawData/unite_general_release.fasta.gz",
+                             multithread = FALSE)
+saveRDS(taxa_ITS, file = "03_Results/rds/ITS/taxaITS.RDS")
+
+```
+
+
+## Asignación taxonómica con DECIPHER (IdTaxa)
+
+```{r assign-taxonomy-decipher}
+
+# ── 16S — SILVA training set ───────────────────────────────────────────────
+dna16S <- DNAStringSet(getSequences(seqtab.nochim16S))
+
+load("01_RawData/silva/SILVA_SSU_r138_2019.RData")  # carga objeto: trainingSet
+
+ids16S <- IdTaxa(dna16S, trainingSet,
+                 strand = "top", processors = NULL, verbose = FALSE)
+
+ranks <- c("domain", "phylum", "class", "order", "family", "genus", "species")
+
+taxid16S <- t(sapply(ids16S, function(x) {
+  m    <- match(ranks, x$rank)
+  taxa <- x$taxon[m]
+  taxa[startsWith(taxa, "unclassified_")] <- NA
+  taxa
+}))
+
+colnames(taxid16S) <- ranks
+rownames(taxid16S) <- getSequences(seqtab.nochim16S)
+
+saveRDS(taxid16S, file = "03_Results/rds/16S/taxid16S-decipher.RDS")
+taxid16S <- readRDS("03_Results/rds/16S/taxid16S-decipher.RDS")
+
+# ── ITS — UNITE training set ───────────────────────────────────────────────
+dnaITS <- DNAStringSet(getSequences(seqtab.nochimITS))
+
+load("01_RawData/silva/UNITE_publicSH_fungi_04.04.2024.RData")  # carga objeto: trainingSet
+
+idsITS <- IdTaxa(dnaITS, trainingSet,
+                 strand = "top", processors = NULL, verbose = FALSE)
+
+taxidITS <- t(sapply(idsITS, function(x) {
+  m    <- match(ranks, x$rank)
+  taxa <- x$taxon[m]
+  taxa[startsWith(taxa, "unclassified_")] <- NA
+  taxa
+}))
+colnames(taxidITS) <- ranks
+rownames(taxidITS) <- getSequences(seqtab.nochimITS)
+
+saveRDS(taxidITS, file = "03_Results/rds/ITS/taxidITS_decipher.RDS")
+```
+
+## phyloseq
+
+Construcción de los objetos phyloseq: Los objetos se construyen uniendo la tabla de ASVs sin quimeras, la tabla taxonómica y
+los metadatos de muestra producidos en la sección anterior.
+
+```{r build-phyloseq}
+# --- Preparar metadatos de muestra ---
+# Asegurarse de que los nombres de fila coincidan con los nombres de muestra
+samdf16S <- metadata[metadata$amplicon == "16S", ]
+rownames(samdf16S) <- samdf16S$Run
+
+samdfITS <- metadata[metadata$amplicon == "ITS", ]
+rownames(samdfITS) <- samdfITS$Run
+
+# --- Objeto 16S (bacterioma) ---
+ps16S <- phyloseq(
+  otu_table(seqtab.nochim16S, taxa_are_rows = FALSE),
+  tax_table(taxid16S),
+  sample_data(samdf16S)
+)
+
+# Renombrar ASVs como "ASV1", "ASV2", …  para facilitar la lectura
+taxa_names(ps16S) <- paste0("ASV", seq_len(ntaxa(ps16S)))
+
+cat("=== Bacterioma (16S) ===\n")
+ps16S
+
+# --- Objeto ITS (fungoma) ---
+# Descomentar cuando taxa_ITS esté disponible
+# ps_ITS <- phyloseq(
+#   otu_table(seqtab.nochimITS, taxa_are_rows = FALSE),
+#   tax_table(taxa_ITS),
+#   sample_data(samdfITS)
+# )
+# taxa_names(ps_ITS) <- paste0("ASV", seq_len(ntaxa(ps_ITS)))
+# cat("\n=== Fungoma (ITS) ===\n")
+# ps_ITS
+```
+
+```{r save-phyloseq-raw}
+saveRDS(ps16S, "03_Results/rds/16S/ps16S_raw.RDS")
+# saveRDS(ps_ITS, "03_Results/rds/ITS/psITS_raw.RDS")
+```
+
+## Resumen del objeto
+
+```{r ps-summary}
+cat("Número de ASVs:", ntaxa(ps16S), "\n")
+cat("Número de muestras:", nsamples(ps16S), "\n")
+cat("Rangos taxonómicos:", paste(rank_names(ps16S), collapse = " > "), "\n")
+cat("Variables de metadatos:", paste(sample_variables(ps16S), collapse = ", "), "\n")
+
+kable(data.frame(tax_table(ps16S))[1:6, ],
+      caption = "Primeros 6 ASVs y su clasificación taxonómica")
+```
+
+---
+
+## Preprocesamiento y Filtrado
+
+### Distribución de lecturas por muestra
+
+```{r read-distribution}
+ss16S <- sample_sums(ps16S)
+summary(ss16S)
+
+n_st   <- length(unique(sample_data(ps16S)$amplicon))
+colores <- brewer.pal(max(n_st, 3), "Set1")
+
+df_reads <- data.frame(
+  Sample     = names(ss16S),
+  TotalReads = ss16S
+)
+
+ggplot(df_reads, aes(x = reorder(Sample, TotalReads), y = TotalReads)) +
+  geom_bar(stat = "identity", fill = "#377eb8") +
+  coord_flip() +
+  scale_y_continuous(labels = comma) +
+  labs(title = "Total de Lecturas por Muestra (16S)",
+       x = "Muestra", y = "Número de lecturas") +
+  theme_bw(base_size = 11)
+```
+
+### Filtrado de taxa poco prevalentes
+
+```{r filtering}
+cat("ASVs originales:", ntaxa(ps16S), "\n")
+
+# Paso 1: ASVs con menos de 10 lecturas totales
+ps16S_f <- prune_taxa(taxa_sums(ps16S) > 10, ps16S)
+
+# Paso 2: ASVs presentes en al menos el 5% de las muestras
+prev_thr  <- 0.05 * nsamples(ps16S_f)
+taxa_prev <- rowSums(otu_table(ps16S_f) > 0)
+ps16S_f   <- prune_taxa(taxa_prev >= prev_thr, ps16S_f)
+
+cat("ASVs tras filtrado:", ntaxa(ps16S_f), "\n")
+cat("ASVs removidos:", ntaxa(ps16S) - ntaxa(ps16S_f), "\n")
+```
+
+
+### Rarefacción
+
+```{r rarefaction}
+min_depth <- min(sample_sums(ps16S_f))
+cat("Profundidad mínima:", min_depth, "\n")
+
+ps16S_rare <- rarefy_even_depth(
+  ps16S_f,
+  sample.size = min_depth,
+  rngseed     = 123,
+  replace     = FALSE,
+  trimOTUs    = TRUE,
+  verbose     = FALSE
+)
+
+cat("Muestras tras rarefacción:", nsamples(ps16S_rare), "\n")
+cat("ASVs tras rarefacción:",     ntaxa(ps16S_rare),    "\n")
 ```
