@@ -40,18 +40,75 @@ set.seed(123)
 # (muestras del bacterioma).
 
 samdf16S <- metadata[metadata$amplicon == "16S", ]
+samdfITS <- metadata[metadata$amplicon == "ITS", ]
 
 # Se asignan los nombres de acceso SRA (columna 'Run') como nombres de fila.
 # phyloseq requiere que los nombres de fila de sample_data coincidan con los
 # nombres de columna de otu_table.
 
-rownames(samdf16S) <- samdf16S$Run
+rownames(samdf16S) <- samdf16S$Host
 
-# Mismo subconjunto para ITS (muestras del micobioma).
-samdfITS <- metadata[metadata$amplicon == "ITS", ]
 rownames(samdfITS) <- samdfITS$Run
 
-# --- Construir el objeto phyloseq 16S (bacterioma) ---
+# ─────────────────────────────────────────────────────────────────────────────
+# 15. RENOMBRAR FILAS DE SEQTAB PARA COINCIDIR CON SAMPLE_DATA
+# ─────────────────────────────────────────────────────────────────────────────
+ 
+# Problema: makeSequenceTable() asigna los accesos SRR (columna Run) como
+# nombres de fila de seqtab.nochim. En phyloseq.R los nombres de fila de
+# sample_data se construyen como Host_Run (p. ej., "Phaseolus vulgaris_SRR123")
+# para evitar duplicados. Si los nombres de fila de otu_table y sample_data
+# no coinciden exactamente, phyloseq no puede unir las tablas y devuelve
+# un objeto vacío o con muestras desapareadas.
+#
+# Solución: renombrar las filas de seqtab.nochim16S y seqtab.nochimITS
+# al formato Host_Run ANTES de construir el objeto phyloseq.
+#
+# metadata ya contiene las columnas Run, Host y amplicon (creada en el paso 3).
+# match() localiza la posición de cada nombre de fila de seqtab dentro del
+# vector Run filtrado por amplicon, devolviendo un vector de índices.
+# Con esos índices se construyen las etiquetas Host_Run en el mismo orden
+# que las filas de seqtab.
+ 
+# --- 16S ---
+# Subconjunto de metadata correspondiente al amplicon 16S.
+meta16S_sub <- metadata[metadata$amplicon == "16S", ]
+ 
+# match() devuelve, para cada Run en seqtab, su posición dentro de meta16S_sub.
+# Garantiza que el orden de los nuevos nombres siga el orden de las filas de seqtab.
+idx16S <- match(rownames(seqtab.nochim16S), meta16S_sub$Run)
+ 
+# Nuevos nombres de fila: "Host_Run" — únicos y biológicamente informativos.
+rownames(seqtab.nochim16S) <- paste(meta16S_sub$Host[idx16S],
+                                     meta16S_sub$Run[idx16S],
+                                     sep = "_")
+ 
+# --- ITS ---
+# Mismo procedimiento para la tabla ITS.
+metaITS_sub <- metadata[metadata$amplicon == "ITS", ]
+idxITS      <- match(rownames(seqtab.nochimITS), metaITS_sub$Run)
+ 
+rownames(seqtab.nochimITS) <- paste(metaITS_sub$Host[idxITS],
+                                     metaITS_sub$Run[idxITS],
+                                     sep = "_")
+ 
+# Verificar que los renombrados sean correctos antes de pasar a phyloseq.R.
+# Estos valores deben coincidir exactamente con los nombres de fila que
+# phyloseq.R construye mediante paste(samdf$Host, samdf$Run, sep = "_").
+
+cat("Primeros nombres de fila seqtab 16S:\n")
+head(rownames(seqtab.nochim16S))
+cat("Primeros nombres de fila seqtab ITS:\n")
+head(rownames(seqtab.nochimITS))
+ 
+# Guardar las tablas con los nombres de fila ya corregidos.
+# phyloseq.R puede cargarlas directamente sin necesidad de renombrar de nuevo.
+saveRDS(seqtab.nochim16S, file = "03_Results/rds/16S/seqtab.nochim16S_hostrun.RDS")
+saveRDS(seqtab.nochimITS, file = "03_Results/rds/ITS/seqtab.nochimITS_hostrun.RDS")
+
+
+
+# Construir el objeto phyloseq 16S (bacterioma)
 
 # phyloseq() ensambla los tres componentes en un objeto S4 validado.
 # • otu_table(): envuelve la matriz de conteos filtrada por quimeras.

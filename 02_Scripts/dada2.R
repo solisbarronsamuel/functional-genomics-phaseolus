@@ -12,7 +12,7 @@
 # quietly = TRUE suprime mensajes de advertencia durante la comprobación.
 
 # if (!requireNamespace("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
+#  install.packages("BiocManager")
 
 # BiocManager::install(version = ...) actualiza o instala el núcleo de
 # Bioconductor a la versión indicada (3.23). Esto garantiza compatibilidad
@@ -248,10 +248,11 @@ FWD.orients.16S <- allOrients(FWD.16S)
 REV.orients.16S <- allOrients(REV.16S)
 FWD.orients.16S   # imprime para verificar las cuatro orientaciones
 
-# ── 5b. Filtrar bases N y contar hits de primers antes de cortar ─────────────
+# Filtrar y contar primers antes de cortar
 
-# file.path() construye rutas de archivo de forma portable (maneja / y \ según SO).
-# Se crea la ruta de salida para lecturas filtradas de Ns en el subdirectorio "filtN".
+# file.path() construye rutas de archivo de forma portable.
+# Se crea la ruta de salida para lecturas filtradas en el subdirectorio "filtN".
+
 fnFs16S.filtN <- file.path(path16S, "filtN", basename(fnFs16S))
 fnRs16S.filtN <- file.path(path16S, "filtN", basename(fnRs16S))
 
@@ -259,6 +260,7 @@ fnRs16S.filtN <- file.path(path16S, "filtN", basename(fnRs16S))
 # Aquí solo se usa para eliminar lecturas con bases N (maxN = 0), lo cual es
 # un requisito previo al aprendizaje del modelo de error de DADA2.
 # multithread = TRUE acelera el proceso usando múltiples núcleos (usar FALSE en Windows).
+
 filterAndTrim(fnFs16S, fnFs16S.filtN,
               fnRs16S, fnRs16S.filtN,
               maxN = 0, multithread = TRUE)
@@ -268,6 +270,7 @@ filterAndTrim(fnFs16S, fnFs16S.filtN,
 # sread(readFastq(fn)) lee las secuencias del archivo FASTQ.
 # fixed = FALSE activa la interpretación de códigos IUPAC ambiguos en el patrón.
 # sum(nhits > 0) cuenta cuántas lecturas tienen al menos una coincidencia.
+
 primerHits <- function(primer, fn) {
   nhits <- vcountPattern(primer, sread(readFastq(fn)), fixed = FALSE)
   return(sum(nhits > 0))
@@ -276,6 +279,7 @@ primerHits <- function(primer, fn) {
 # rbind() construye una tabla donde cada fila es una combinación dirección/orientación.
 # sapply() aplica primerHits a cada orientación del primer y devuelve un vector.
 # Si los primers están presentes (antes de cortar), se esperan cuentas > 0.
+
 rbind(
   FWD.ForwardReads = sapply(FWD.orients.16S, primerHits, fn = fnFs16S.filtN[[1]]),
   FWD.ReverseReads = sapply(FWD.orients.16S, primerHits, fn = fnRs16S.filtN[[1]]),
@@ -283,23 +287,30 @@ rbind(
   REV.ReverseReads = sapply(REV.orients.16S, primerHits, fn = fnRs16S.filtN[[1]])
 )
 
-# ── 5c. Ejecutar Cutadapt y verificar ────────────────────────────────────────
+# Ejecutar Cutadapt
 
 # Ruta al ejecutable de Cutadapt instalado en el sistema.
 # Cambiar si Cutadapt está instalado en otra ubicación.
+
 cutadapt <- "/usr/bin/cutadapt"
+
 # system2() ejecuta un comando del sistema operativo desde R.
 # args = "--version" imprime la versión instalada como verificación.
+
 system2(cutadapt, args = "--version")
 
 # Se construye la ruta al directorio de salida para lecturas recortadas del 16S.
+
 path.cut.16S <- file.path(path16S, "cutadapt")
+
 # dir.exists() verifica si el directorio ya existe; si no, dir.create() lo crea.
 # Esto evita errores si el directorio ya fue creado en una ejecución anterior.
+
 if (!dir.exists(path.cut.16S)) dir.create(path.cut.16S)
 
 # Se construyen las rutas de los archivos de salida recortados (mismo nombre que
 # la entrada pero dentro del directorio "cutadapt").
+
 fnFs16S.cut <- file.path(path.cut.16S, basename(fnFs16S))
 fnRs16S.cut <- file.path(path.cut.16S, basename(fnRs16S))
 
@@ -307,6 +318,7 @@ fnRs16S.cut <- file.path(path.cut.16S, basename(fnRs16S))
 # El triple ::: accede a una función interna (no exportada) del paquete dada2.
 # Los RC de los primers son necesarios para recortar artefactos de read-through
 # (cuando la lectura es más larga que el amplicón y atraviesa el otro primer).
+
 FWD.RC.16S <- dada2:::rc(FWD.16S)
 REV.RC.16S <- dada2:::rc(REV.16S)
 
@@ -314,12 +326,14 @@ REV.RC.16S <- dada2:::rc(REV.16S)
 # -g: recortar el primer en el extremo 5' de R1 (forward)
 # -a: recortar el RC del reverse en el extremo 3' de R1 (artefacto read-through)
 # -G y -A: análogos para R2 (reverse)
+
 R1.flags.16S <- paste("-g", FWD.16S, "-a", REV.RC.16S)
 R2.flags.16S <- paste("-G", REV.16S, "-A", FWD.RC.16S)
 
 # Bucle for sobre todas las muestras: se ejecuta Cutadapt una vez por muestra.
 # seq_along(fnFs16S) genera la secuencia 1, 2, ..., n donde n es el nº de muestras.
 # En cada iteración i, se procesan el par R1[i] / R2[i] correspondiente.
+
 for (i in seq_along(fnFs16S)) {
   system2(cutadapt,
           args = c(R1.flags.16S, R2.flags.16S,
@@ -332,6 +346,7 @@ for (i in seq_along(fnFs16S)) {
 
 # Verificación post-corte: todas las cuentas deben ser 0 o cercanas a 0.
 # Si quedan cuentas altas, puede indicar un problema con los flags de Cutadapt.
+
 rbind(
   FWD.ForwardReads = sapply(FWD.orients.16S, primerHits, fn = fnFs16S.cut[[1]]),
   FWD.ReverseReads = sapply(FWD.orients.16S, primerHits, fn = fnRs16S.cut[[1]]),
@@ -341,53 +356,63 @@ rbind(
 
 # Se actualizan los vectores de rutas para apuntar a los archivos recortados,
 # que serán la entrada para el resto del pipeline DADA2.
+
 cutFs16S <- sort(list.files(path.cut.16S, pattern = "_1.fastq", full.names = TRUE))
 cutRs16S <- sort(list.files(path.cut.16S, pattern = "_2.fastq", full.names = TRUE))
 
 # Función auxiliar: extrae el nombre de muestra del nombre de archivo recortado.
+
 get.sample.name <- function(fname) strsplit(basename(fname), "_")[[1]][1]
+
 # unname() elimina los nombres del vector resultante (los nombres serían las rutas).
+
 sample.names16S <- unname(sapply(cutFs16S, get.sample.name))
+
 head(sample.names16S)   # verificar los primeros nombres
 
 # Guardar los vectores de rutas recortadas para poder reanudar la sesión.
+
 saveRDS(cutFs16S, file = "03_Results/rds/16S/cutFs16S.RDS")
 saveRDS(cutRs16S, file = "03_Results/rds/16S/cutRs16S.RDS")
 
 # Punto de reanudación: cargar desde disco sin necesidad de reejecutar Cutadapt.
+
 cutFs16S <- readRDS("03_Results/rds/16S/cutFs16S.RDS")
 cutRs16S <- readRDS("03_Results/rds/16S/cutRs16S.RDS")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 6. ELIMINACIÓN DE PRIMERS CON CUTADAPT — 18S V4
-#    Forward: 5'-CCAGCASCYGCGGTAATTCC-3'
-#    Reverse: 5'-ACTTTCGTTCTTGATYRA-3'
-# ─────────────────────────────────────────────────────────────────────────────
 
-# ── 6a. Definir primers ───────────────────────────────────────────────────────
+# 6. ELIMINACIÓN DE PRIMERS CON CUTADAPT — 18S V4
+
+
+# Definir primers
 
 FWD.18S <- "CCAGCASCYGCGGTAATTCC"  # primer forward V4-18S
 REV.18S <- "ACTTTCGTTCTTGATYRA"    # primer reverse V4-18S
 
 # Misma función allOrients definida anteriormente para el 16S.
+
 FWD.orients.18S <- allOrients(FWD.18S)
 REV.orients.18S <- allOrients(REV.18S)
 FWD.orients.18S   # inspeccionar
 
-# ── 6b. Filtrar Ns y verificar hits ──────────────────────────────────────────
+# Filtrar Ns y verificar
 
 # Rutas de salida para las lecturas ITS filtradas de Ns.
+
 fnFs18S.filtN <- file.path(pathITS, "filtN", basename(fnFsITS))
 fnRs18S.filtN <- file.path(pathITS, "filtN", basename(fnRsITS))
 
 # Eliminar lecturas con bases N del conjunto ITS.
 # multithread = FALSE es la opción segura en Windows.
+
 filterAndTrim(fnFsITS, fnFs18S.filtN,
               fnRsITS, fnRs18S.filtN,
               maxN = 0, multithread = FALSE)
 
 # Verificar presencia de primers antes de cortar (se esperan cuentas > 0).
+
 rbind(
   FWD.ForwardReads = sapply(FWD.orients.18S, primerHits, fn = fnFs18S.filtN[[1]]),
   FWD.ReverseReads = sapply(FWD.orients.18S, primerHits, fn = fnRs18S.filtN[[1]]),
@@ -395,25 +420,30 @@ rbind(
   REV.ReverseReads = sapply(REV.orients.18S, primerHits, fn = fnRs18S.filtN[[1]])
 )
 
-# ── 6c. Ejecutar Cutadapt y verificar ────────────────────────────────────────
+# Ejecutar Cutadapt y verificar
 
 # Directorio de salida para lecturas ITS recortadas.
+
 path.cut.18S <- file.path(pathITS, "cutadapt")
 if (!dir.exists(path.cut.18S)) dir.create(path.cut.18S)
 
 # Rutas de salida de los archivos recortados para el 18S/ITS.
+
 fnFs18S.cut <- file.path(path.cut.18S, basename(fnFsITS))
 fnRs18S.cut <- file.path(path.cut.18S, basename(fnRsITS))
 
 # Calcular reversos-complementos de los primers del 18S.
+
 FWD.RC.18S <- dada2:::rc(FWD.18S)
 REV.RC.18S <- dada2:::rc(REV.18S)
 
-# Construir los flags de Cutadapt para el 18S (misma lógica que el 16S).
+# Construir los flags de Cutadapt para el 18S.
+
 R1.flags.18S <- paste("-g", FWD.18S, "-a", REV.RC.18S)
 R2.flags.18S <- paste("-G", REV.18S, "-A", FWD.RC.18S)
 
 # Ejecutar Cutadapt para cada muestra ITS.
+
 for (i in seq_along(fnFsITS)) {
   system2(cutadapt,
           args = c(R1.flags.18S, R2.flags.18S,
@@ -425,6 +455,7 @@ for (i in seq_along(fnFsITS)) {
 }
 
 # Confirmar que los primers fueron eliminados (todas las cuentas deben ser ~0).
+
 rbind(
   FWD.ForwardReads = sapply(FWD.orients.18S, primerHits, fn = fnFs18S.cut[[1]]),
   FWD.ReverseReads = sapply(FWD.orients.18S, primerHits, fn = fnRs18S.cut[[1]]),
@@ -433,36 +464,39 @@ rbind(
 )
 
 # Actualizar vectores de rutas para apuntar a los archivos recortados del 18S.
+
 cutFs18S <- sort(list.files(path.cut.18S, pattern = "_1.fastq", full.names = TRUE))
 cutRs18S <- sort(list.files(path.cut.18S, pattern = "_2.fastq", full.names = TRUE))
 
 # Extraer nombres de muestra de los archivos 18S recortados.
+
 sample.names18S <- unname(sapply(cutFs18S, get.sample.name))
 head(sample.names18S)
 
-# CORRECCIÓN: la línea original tenía una coma doble (cutRs18S,,) que causaba
-# error de sintaxis. Ambas rutas apuntan correctamente a /ITS/ (no a /16S/).
 saveRDS(cutFs18S, file = "03_Results/rds/ITS/cutFsITS.RDS")
-saveRDS(cutRs18S, file = "03_Results/rds/ITS/cutRsITS.RDS")  # coma doble eliminada
+saveRDS(cutRs18S, file = "03_Results/rds/ITS/cutRsITS.RDS")
 
 # Punto de reanudación.
 cutFs18S <- readRDS("03_Results/rds/ITS/cutFsITS.RDS")
 cutRs18S <- readRDS("03_Results/rds/ITS/cutRsITS.RDS")
 
+# ─────────────────────────────────────────────────────────────────────────────
 
-# ─────────────────────────────────────────────────────────────────────────────
 # 7. PERFILES DE CALIDAD PHRED
-# ─────────────────────────────────────────────────────────────────────────────
 
 # file.info()$size devuelve el tamaño en bytes de cada archivo.
 # Se filtran archivos < 50 bytes porque están vacíos o prácticamente vacíos,
 # lo que causaría errores al intentar graficar su perfil de calidad.
-cutFs16S.nonempty <- cutFs16S[file.info(cutFs16S)$size > 50]
-cutRs16S.nonempty <- cutRs16S[file.info(cutRs16S)$size > 50]
+
+# Ayuda del chat porque dos plots no se generaron y marcaba error.
+
+cutFs16S.nonempty <- cutFs16S[file.info(cutFs16S)$size > 20]
+cutRs16S.nonempty <- cutRs16S[file.info(cutRs16S)$size > 20]
+
 
 # Para diagnóstico adicional: contar el número de lecturas en los primeros 20 archivos.
 # length(readFastq(f)) devuelve cuántas lecturas tiene el archivo f.
-library(ShortRead)
+
 sapply(cutFs16S[1:20], function(f) length(readFastq(f)))
 
 # pdf() abre un dispositivo gráfico y redirige todas las gráficas al archivo PDF.
@@ -477,11 +511,12 @@ plotQualityProfile(cutFs16S[1:20])
 dev.off()
 
 # 16S — lecturas reverse
-# CORRECCIÓN: el original usaba cutFs16S.nonempty (¡lecturas forward!) para el PDF
-# de lecturas reverse. Se corrigió a cutRs16S.nonempty.
 pdf("03_Results/phred/16S/quality-reverse-16S.pdf", width = 20, height = 12)
 plotQualityProfile(cutRs16S.nonempty[1:20])
 dev.off()
+
+# Sigue el error: Error in density.default(qscore): 'x' contains missing values
+# lectura dentro del archivo FASTQ tiene longitud 0 después del recorte de Cutadapt
 
 # ITS — lecturas forward
 pdf("03_Results/phred/ITS/quality-forward-ITS.pdf", width = 20, height = 12)
@@ -493,13 +528,13 @@ pdf("03_Results/phred/ITS/quality-reverse-ITS.pdf", width = 20, height = 12)
 plotQualityProfile(cutRs18S[1:20])
 dev.off()
 
+# ─────────────────────────────────────────────────────────────────────────────
 
-# ─────────────────────────────────────────────────────────────────────────────
 # 8. FILTRADO DE CALIDAD
-# ─────────────────────────────────────────────────────────────────────────────
 
 # Se construyen las rutas de salida para las lecturas filtradas por calidad,
 # usando un subdirectorio "filtered" dentro de la carpeta de lecturas recortadas.
+
 filtFs16S <- file.path(path.cut.16S, "filtered", basename(cutFs16S))
 filtRs16S <- file.path(path.cut.16S, "filtered", basename(cutRs16S))
 filtFsITS <- file.path(path.cut.18S, "filtered", basename(cutFs18S))
@@ -508,6 +543,7 @@ filtRsITS <- file.path(path.cut.18S, "filtered", basename(cutRs18S))
 # names() asigna nombres a los elementos del vector de rutas.
 # DADA2 requiere que los vectores de archivos filtrados tengan los nombres de
 # muestra para asociar correctamente los resultados a cada muestra.
+
 names(filtFs16S) <- samples.names16S
 names(filtRs16S) <- samples.names16S
 names(filtFsITS) <- samples.namesITS
@@ -516,16 +552,17 @@ names(filtRsITS) <- samples.namesITS
 # filterAndTrim() aplica el filtrado de calidad completo a las lecturas 16S.
 # El resultado asv16S es una tabla con el conteo de lecturas antes y después
 # del filtrado para cada muestra (útil para el tracking posterior).
-# Parámetros:
-#   truncLen = c(240, 160) — trunca R1 a 240 pb y R2 a 160 pb
-#                            (ajustar según los perfiles PHRED del paso anterior)
-#   maxN = 0               — elimina cualquier lectura que contenga una N
-#   maxEE = c(2, 2)        — descarta lecturas con más de 2 errores esperados
-#                            (errores esperados = suma de probabilidades de error por base)
-#   truncQ = 2             — trunca en la primera base con calidad ≤ 2
-#   rm.phix = TRUE         — elimina lecturas que mapean contra PhiX (control interno)
-#   compress = TRUE        — escribe los archivos de salida en formato gzip
-#   multithread = TRUE     — usa múltiples núcleos (FALSE en Windows)
+
+truncLen = c(240, 160) # trunca R1 a 240 pb y R2 a 160 pb
+                       #  (ajustar según los perfiles PHRED del paso anterior)
+   maxN = 0            # elimina cualquier lectura que contenga una N
+   maxEE = c(2, 2)     # descarta lecturas con más de 2 errores esperados
+                       #  (errores esperados = suma de probabilidades de error por base)
+   truncQ = 2          # trunca en la primera base con calidad ≤ 2
+   rm.phix = TRUE      # elimina lecturas que mapean contra PhiX (control interno)
+   compress = TRUE     # escribe los archivos de salida en formato gzip
+   multithread = TRUE  # usa múltiples núcleos (FALSE en Windows)
+
 asv16S <- filterAndTrim(
   cutFs16S, filtFs16S,
   cutRs16S, filtRs16S,

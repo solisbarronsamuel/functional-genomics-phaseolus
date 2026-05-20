@@ -654,64 +654,8 @@ kable(data.frame(tax_table(ps16S))[1:6, ],
 
 ### Distribución de lecturas por muestra
 
-```{r}
-
-# ── Distribución de lecturas por muestra (16S) ─────────────────────────────
-ss16S   <- sample_sums(ps16S)
-meta16S <- as.data.frame(sample_data(ps16S))
-
-df_reads <- data.frame(
-  Sample     = names(ss16S),
-  TotalReads = ss16S,
-  row.names  = NULL
-)
-
-df_reads <- merge(
-  df_reads,
-  meta16S[, "Sample.Name", drop = FALSE],
-  by.x  = "Sample",
-  by.y  = "row.names",
-  all.x = TRUE
-)
-
-df_reads$Genotipo <- sub("^[0-9]+_", "", df_reads$Sample.Name)
-
-genotipos <- sort(unique(df_reads$Genotipo))
-n_gen     <- length(genotipos)
-colores   <- setNames(
-  colorRampPalette(brewer.pal(min(n_gen, 11), "Set3"))(n_gen),
-  genotipos
-)
-
-n_samples <- nrow(df_reads)
-
-ggplot(df_reads, aes(x = reorder(Sample.Name, TotalReads),
-                     y = TotalReads,
-                     fill = Genotipo)) +
-  geom_bar(stat = "identity") +
-  coord_flip() +
-  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.02))) +
-  scale_fill_manual(values = colores) +
-  labs(title = "Total de Lecturas por Muestra (16S)",
-       x     = NULL,
-       y     = "Número de lecturas",
-       fill  = "Genotipo") +
-  theme_bw(base_size = 10) +
-  theme(
-    axis.text.y    = element_text(size = 5.5, lineheight = 0.85),
-    legend.position = "bottom",
-    legend.key.size = unit(0.4, "cm"),
-    legend.text     = element_text(size = 7),
-    plot.margin     = margin(t = 8, r = 12, b = 8, l = 4)
-  )
-
-# Save at a tall resolution so every label is legible
-ggsave("03_Results/figures/16S/reads_por_muestra_16S.png",
-       width = 10, height = 22, dpi = 200)
-
-```
-
 ```{r read-distribution}
+
 ss16S <- sample_sums(ps16S)
 summary(ss16S)
 
@@ -747,6 +691,34 @@ ggplot(df_reads, aes(x = reorder(Sample, TotalReads),
 
 ### Filtrado de taxa poco prevalentes
 
+```{r}
+
+# ── Filtrado de taxa poco prevalentes ──────────────────────────────────────
+cat("ASVs originales:", ntaxa(ps16S), "\n")
+
+# Paso 1: eliminar ASVs con menos de 10 lecturas totales
+ps16S_f <- prune_taxa(taxa_sums(ps16S) > 10, ps16S)
+cat("ASVs tras umbral de abundancia (> 10 lecturas):", ntaxa(ps16S_f), "\n")
+
+# Paso 2: eliminar ASVs presentes en menos del 5 % de las muestras
+# taxa_sums/sample_sums respetan la orientación de otu_table; usar
+# apply sobre la dimensión correcta es más seguro que rowSums/colSums.
+prev_thr <- 0.05 * nsamples(ps16S_f)
+
+asv <- as(otu_table(ps16S_f), "matrix")
+
+# Si las muestras son filas (taxa_are_rows = FALSE), las columnas son taxa
+if (!taxa_are_rows(ps16S_f)) asv <- t(asv)   # ahora siempre taxa × muestras
+
+taxa_prev <- rowSums(asv > 0)                # una entrada por taxón
+
+ps16S_f <- prune_taxa(taxa_prev >= prev_thr, ps16S_f)
+
+cat("ASVs tras filtrado de prevalencia (≥ 5 % muestras):", ntaxa(ps16S_f), "\n")
+cat("ASVs removidos en total:", ntaxa(ps16S) - ntaxa(ps16S_f), "\n")
+
+```
+
 ```{r filtering}
 cat("ASVs originales:", ntaxa(ps16S), "\n")
 
@@ -761,7 +733,6 @@ ps16S_f   <- prune_taxa(taxa_prev >= prev_thr, ps16S_f)
 cat("ASVs tras filtrado:", ntaxa(ps16S_f), "\n")
 cat("ASVs removidos:", ntaxa(ps16S) - ntaxa(ps16S_f), "\n")
 ```
-
 
 ### Rarefacción
 
@@ -788,8 +759,6 @@ cat("ASVs tras rarefacción:",     ntaxa(ps16S_rare),    "\n")
 ps16S_rel <- transform_sample_counts(ps16S_f, function(x) x / sum(x))
 head(round(sample_sums(ps16S_rel), 4))  # deben ser todos 1
 ```
-
----
 
 ## Análisis de Diversidad
 
@@ -880,4 +849,145 @@ ggplot(df_bar16S, aes(x = Sample, y = Abundance, fill = Phylum)) +
   theme(axis.text.x     = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 7),
         legend.position = "bottom",
         legend.key.size = unit(0.4, "cm"))
+```
+
+### Diversidad Beta
+
+La **diversidad beta** mide diferencias en composición microbiana *entre* muestras.
+
+```{r beta-distances}
+dist_bray16S <- phyloseq::distance(ps16S_rel, method = "bray")
+cat("Dimensiones Bray-Curtis:", attr(dist_bray16S, "Size"), "x",
+    attr(dist_bray16S, "Size"), "\n")
+```
+
+```{r fig-pcoa, fig.cap="PCoA basada en Bray-Curtis — 16S"}
+ord_bray16S <- ordinate(ps16S_rel, method = "PCoA", distance = dist_bray16S)
+eig16S      <- ord_bray16S$values$Eigenvalues
+var16S      <- round(eig16S / sum(eig16S) * 100, 1)
+cat("Eje 1:", var16S[1], "% | Eje 2:", var16S[2], "%\n")
+
+plot_ordination(ps16S_rel, ord_bray16S) +
+  geom_point(size = 4, alpha = 0.9, color = "#377eb8") +
+  labs(title = "PCoA — Bray-Curtis (16S)",
+       x = paste0("PCoA1 [", var16S[1], "%]"),
+       y = paste0("PCoA2 [", var16S[2], "%]")) +
+  theme_bw(base_size = 12)
+```
+
+```{r fig-nmds, fig.cap="NMDS basada en Bray-Curtis — 16S"}
+ord_nmds16S <- ordinate(ps16S_rel, method = "NMDS", distance = "bray")
+cat("Stress NMDS:", round(ord_nmds16S$stress, 4), "\n")
+
+plot_ordination(ps16S_rel, ord_nmds16S) +
+  geom_point(size = 4, alpha = 0.9, color = "#e41a1c") +
+  annotate("text", x = Inf, y = -Inf,
+           label = paste("Stress =", round(ord_nmds16S$stress, 3)),
+           hjust = 1.1, vjust = -0.5, size = 3.5) +
+  labs(title = "NMDS — Bray-Curtis (16S)") +
+  theme_bw(base_size = 12)
+```
+
+---
+
+## Visualizaciones
+
+### Composición taxonómica (barras)
+
+```{r fig-barplot, fig.cap="Composición a nivel de Phylum — bacterioma 16S"}
+ps16S_phylum <- tax_glom(ps16S_rel, taxrank = "Phylum", NArm = TRUE)
+top10_ph     <- names(sort(taxa_sums(ps16S_phylum), decreasing = TRUE))[1:10]
+ps16S_top10  <- prune_taxa(top10_ph, ps16S_phylum)
+
+df_bar16S <- psmelt(ps16S_top10)
+
+ggplot(df_bar16S, aes(x = Sample, y = Abundance, fill = Phylum)) +
+  geom_bar(stat = "identity", position = "stack", width = 0.9) +
+  scale_fill_brewer(palette = "Paired") +
+  scale_y_continuous(labels = percent_format()) +
+  labs(title = "Composición Taxonómica — Phylum (16S)",
+       x = NULL, y = "Abundancia Relativa", fill = "Phylum") +
+  theme_bw(base_size = 9) +
+  theme(axis.text.x     = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 7),
+        legend.position = "bottom",
+        legend.key.size = unit(0.4, "cm"))
+```
+
+
+### Heatmap taxonómico
+
+```{r fig-heatmap, fig.cap="Heatmap de los 30 ASVs más abundantes — 16S"}
+top30_16S    <- names(sort(taxa_sums(ps16S_rel), decreasing = TRUE))[1:30]
+ps16S_top30  <- prune_taxa(top30_16S, ps16S_rel)
+
+plot_heatmap(ps16S_top30, method = "NMDS", distance = "bray",
+             taxa.label = "Genus",
+             low = "#f7fbff", high = "#08306b", na.value = "white") +
+  labs(title = "Heatmap — Top 30 ASVs (16S)") +
+  theme_bw(base_size = 9) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+---
+
+## Análisis Estadísticos
+
+### PERMANOVA
+
+```{r permanova}
+meta16S    <- data.frame(sample_data(ps16S_rel))
+mat_bray16S <- as.matrix(dist_bray16S)
+mat_bray16S <- mat_bray16S[rownames(meta16S), rownames(meta16S)]
+
+# Ajustar la variable del modelo según tus metadatos reales
+# Ejemplo: ~ Run  ó  ~ grupo_tratamiento
+set.seed(123)
+perm16S <- vegan::adonis2(
+  mat_bray16S ~ Run,
+  data = meta16S, permutations = 999
+)
+print(perm16S)
+```
+
+### Kruskal-Wallis sobre Shannon
+
+```{r kruskal-wallis}
+alpha16S$Run <- sample_data(ps16S_rare)$Run
+
+kw16S <- kruskal.test(Shannon ~ Run, data = alpha16S)
+cat("=== Kruskal-Wallis: Shannon (16S) ===\n")
+print(kw16S)
+```
+
+### Abundancia diferencial (DESeq2)
+
+Sustituye `"GrupoA"` y `"GrupoB"` por los valores reales de tu variable de tratamiento.
+
+```{r deseq2, eval=FALSE}
+if (requireNamespace("DESeq2", quietly = TRUE)) {
+  library(DESeq2)
+
+  # Adaptar la variable de grupo a tu diseño experimental
+  # ps_sub16S <- subset_samples(ps16S, grupo %in% c("GrupoA", "GrupoB"))
+  # ps_sub16S <- prune_taxa(taxa_sums(ps_sub16S) > 5, ps_sub16S)
+  # dds16S    <- phyloseq_to_deseq2(ps_sub16S, ~ grupo)
+  # dds16S    <- DESeq2::estimateSizeFactors(dds16S, type = "poscounts")
+  # dds16S    <- DESeq2::DESeq(dds16S, fitType = "mean", quiet = TRUE)
+  # res16S    <- DESeq2::results(dds16S, cooksCutoff = FALSE)
+  # res_sig16S <- res16S[which(!is.na(res16S$padj) & res16S$padj < 0.05), ]
+  # cat("ASVs diferencialmente abundantes (FDR < 5%):", nrow(res_sig16S), "\n")
+}
+```
+
+## Exportación de Resultados
+
+```{r export, eval=FALSE}
+saveRDS(ps16S_f,    "03_Results/rds/16S/ps16S_filtrado.RDS")
+saveRDS(ps16S_rel,  "03_Results/rds/16S/ps16S_rel.RDS")
+saveRDS(ps16S_rare, "03_Results/rds/16S/ps16S_rare.RDS")
+
+write.csv(as.data.frame(otu_table(ps16S_f)),    "03_Results/csv/16S/tabla_asv.csv")
+write.csv(as.data.frame(tax_table(ps16S_f)),    "03_Results/csv/16S/taxonomia.csv")
+write.csv(as.data.frame(sample_data(ps16S_f)),  "03_Results/csv/16S/metadatos.csv")
+write.csv(alpha16S, "03_Results/csv/16S/diversidad_alfa.csv")
 ```
