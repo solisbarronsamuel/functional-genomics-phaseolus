@@ -32,6 +32,23 @@ Los análisis de diversidad alfa y beta se realizarán en R utilizando el paquet
 
 ## 3. Resultados
 
+### Filtrdo por prevalencia y abundancia
+
+Las muestras de los ASVs fueron seleccionadas mediante el umbral de 10 para excluir ruido de secuenciación y eliminaron las que están presentes menos del 5% de las muestras. Las muestras de los ASVs de 16S de 5450 nos quedamos con 3696, los ASVs de ITS de 6634 nos quedamos con 6433. Las muestras de 16S mediante la rarefacción de 16S es de 135 y el ASVs rarefación fue de 1754. Las muestras de ITS la rarefacción es de 134, y el ASVs rarefación fue de 74. Los resultados gráficos del total de lecturas por muestras son los siguientes:
+
+
+```{r, echo=FALSE}
+library(knitr)
+```
+
+```{r, echo=FALSE, out.width="60%"}
+knitr::include_graphics("03_Results/figures/16S/lecturas-16S.png")
+```
+
+```{r, echo=FALSE, out.width="60%"}
+knitr::include_graphics("03_Results/figures/ITS/lecturas-ITS.png")
+```
+
 
 
 

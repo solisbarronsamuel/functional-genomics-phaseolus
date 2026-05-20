@@ -28,76 +28,86 @@ set.seed(123)
 #   • sample_data – metadatos por muestra (similar a data.frame)
 
 # 'metadata' debe estar cargado previamente.
-
-# ──────────────────────────────────────────────────────────────────────────────
-# LOAD OBJECTS FROM DADA2
-# ──────────────────────────────────────────────────────────────────────────────
+# Cargar objectos de dada2.
 
 # Load the chimera-free seqtabs (rows are plain SRR accessions at this point)
+
 seqtab.nochim16S <- readRDS("03_Results/rds/16S/seqtab.nochim16S.RDS")
 seqtab.nochimITS <- readRDS("03_Results/rds/ITS/seqtab.nochimITS.RDS")
 
-# Load taxonomy (DECIPHER output)
-taxid16S <- readRDS("03_Results/rds/16S/taxid16S-decipher.RDS")
-taxidITS  <- readRDS("03_Results/rds/ITS/taxidITS_decipher.RDS")
+# Cargar taxonomía (salida de DECIPHER)
 
-# Reload metadata (only needed to build Host_Run labels and sample_data)
+taxid16S <- readRDS("03_Results/rds/16S/taxid16S-decipher.RDS")
+taxidITS <- readRDS("03_Results/rds/ITS/taxidITS_decipher.RDS")
+
+# Recargar metadatos (solo necesario para generar etiquetas Host_Run y ​​datos de muestra)
+
 metadata16S <- read.csv("01_RawData/csv/16S/SraRunTable16S.csv", stringsAsFactors = FALSE)
 metadataITS <- read.csv("01_RawData/csv/ITS/SraRunTableITS.csv", stringsAsFactors = FALSE)
 metadata16S$amplicon <- "16S"
 metadataITS$amplicon <- "ITS"
 metadata <- rbind(metadata16S, metadataITS)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# RENAME SEQTAB ROWS: SRR → Host_Run
-# seqtab row names come from FASTQ filenames (plain SRR IDs, e.g. "SRR25070549").
-# sample_data row names must match, so both are set to Host_Run format.
-# ──────────────────────────────────────────────────────────────────────────────
+# Uso de la IA para resolver el error, y poder eliminar el Run y agregar un identificador único.
 
-meta16S_sub <- metadata[metadata$amplicon == "16S", ]
-idx16S      <- match(rownames(seqtab.nochim16S), meta16S_sub$Run)
-rownames(seqtab.nochim16S) <- paste(meta16S_sub$Host[idx16S],
-                                    meta16S_sub$Run[idx16S],
-                                    sep = "_")
+# Verificar que no haya duplicados en 16S
+anyDuplicated(samdf16S$Library.Name)  # debe devolver 0
 
-metaITS_sub <- metadata[metadata$amplicon == "ITS", ]
-idxITS      <- match(rownames(seqtab.nochimITS), metaITS_sub$Run)
-rownames(seqtab.nochimITS) <- paste(metaITS_sub$Host[idxITS],
-                                    metaITS_sub$Run[idxITS],
-                                    sep = "_")
+# Verificar que no haya duplicados en ITS
+anyDuplicated(samdfITS$Library.Name)  # debe devolver 0
 
-# ──────────────────────────────────────────────────────────────────────────────
-# BUILD SAMPLE DATA
-# Row names must be identical to the seqtab row names set above.
-# ──────────────────────────────────────────────────────────────────────────────
+# Subconjunto de metadata que contiene solo las muestras del amplicón 16S.
+# El operador [] filtra las filas donde la columna 'amplicon' es igual a "16S".
+
+meta16S_2 <- metadata[metadata$amplicon == "16S", ]
+
+# match() busca cada nombre de fila de seqtab.nochim16S (accesiones SRR)
+# dentro de la columna Library.Name de meta16S_2, y devuelve el vector de índices
+# correspondiente.
+# Los índices permiten alinear los metadatos con el orden
+# exacto de las filas de seqtab.
+
+idx16S <- match(rownames(seqtab.nochim16S), meta16S_2$Host)
+
+# Se reemplazan los nombres de fila de seqtab.nochim16S (antes accesiones SRR)
+# por los valores de la columna Library.Name en el orden dado por idx16S.
+# Ahora cada fila queda identificada únicamente por el nombre del hospedero,
+# por ejemplo: "Phaseolus vulgaris", "60_D149", etc.
+
+rownames(seqtab.nochim16S) <- meta16S_2$Host[idx16S]
+
+# Mismo procedimiento para la tabla ITS: subconjunto de metadata
+# que contiene solo las muestras del amplicón ITS.
+
+metaITS_2 <- metadata[metadata$amplicon == "ITS", ]
+
+# match() alinea los nombres de fila de seqtab.nochimITS con la columna Library.Name
+# de metaITS_2, devolviendo los índices de posición correspondientes.
+
+idxITS <- match(rownames(seqtab.nochimITS), metaITS_2$Host)
+
+# Se reemplazan los nombres de fila de seqtab.nochimITS por los valores
+# de Host en el orden dado por idxITS.
+
+rownames(seqtab.nochimITS) <- metaITS_2$Host[idxITS]
+
+# Elaborar el data.frame de metadatos para las muestras 16S filtrando metadata.
 
 samdf16S <- metadata[metadata$amplicon == "16S", ]
+
+# Elaborar el data.frame de metadatos para las muestras ITS filtrando metadata.
+
 samdfITS  <- metadata[metadata$amplicon == "ITS", ]
 
-rownames(samdf16S) <- paste(samdf16S$Host, samdf16S$Run, sep = "_")
-rownames(samdfITS) <- paste(samdfITS$Host, samdfITS$Run, sep = "_")
+# Los nombres de fila de samdf16S se asignan directamente desde la columna Library.Name.
+# Deben coincidir exactamente con rownames(seqtab.nochim16S) definidos arriba.
 
-# ──────────────────────────────────────────────────────────────────────────────
-# CONSTRUCT PHYLOSEQ OBJECTS
-# ──────────────────────────────────────────────────────────────────────────────
+rownames(samdf16S) <- samdf16S$Library.Name
 
-ps16S <- phyloseq(
-  otu_table(seqtab.nochim16S, taxa_are_rows = FALSE),
-  tax_table(taxid16S),
-  sample_data(samdf16S)
-)
-taxa_names(ps16S) <- paste0("ASV", seq_len(ntaxa(ps16S)))
-cat("=== Bacterioma (16S) ===\n")
-ps16S
+# Los nombres de fila de samdfITS se asignan directamente desde la columna Library.Name.
+# Deben coincidir exactamente con rownames(seqtab.nochimITS) definidos arriba.
 
-ps_ITS <- phyloseq(
-  otu_table(seqtab.nochimITS, taxa_are_rows = FALSE),
-  tax_table(taxidITS),
-  sample_data(samdfITS)
-)
-taxa_names(ps_ITS) <- paste0("ASV", seq_len(ntaxa(ps_ITS)))
-cat("\n=== Fungoma (ITS) ===\n")
-ps_ITS
+rownames(samdfITS)  <- samdfITS$Library.Name
 
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -127,57 +137,152 @@ kable(data.frame(tax_table(ps16S))[1:6, ],
 
 # 4.  PREPROCESAMIENTO Y FILTRADO
 
-# Distribución de lecturas por muestra
+# ─────────────────────────────────────────────────────────────────────────────
 
-# sample_sums() calcula el total de lecturas por muestra cuando taxa_are_rows = FALSE).
+# Distribución de lecturas
+
+# ── 16S
+
+# sample_sums() recorre cada muestra del objeto phyloseq y suma todas sus
+# lecturas (ASVs).
 
 ss16S <- sample_sums(ps16S)
-summary(ss16S)   # mín, Q1, mediana, Q3, máx
 
-# Determinar cuántos tipos de amplicón distintos hay.
+# summary() imprime en consola las 6 estadísticas descriptivas del vector:
+# mínimo, Q1, mediana, media, Q3 y máximo. Sirve para detectar muestras con
+# muy pocas lecturas (posibles fallas de secuenciación) o valores atípicos altos.
 
-n_st   <- length(unique(sample_data(ps16S)$amplicon))
+summary(ss16S)
 
-# brewer.pal() devuelve un vector de n códigos HEX de la paleta "Set1".
-# max(..., 3) asegura al menos 3 colores (brewer.pal requiere n ≥ 3).
+# sample_data() extrae el data.frame de metadatos del objeto phyloseq.
+# $amplicon accede a la columna que indica el tipo de amplicón (p. ej. 16S, ITS).
+# unique() elimina duplicados, dejando solo los valores distintos.
+# length() cuenta cuántos tipos únicos hay. Se usará para definir la paleta.
+
+n_st <- length(unique(sample_data(ps16S)$amplicon))
+
+# brewer.pal() genera una paleta discreta de n colores en HEX de RColorBrewer.
+# max(n_st, 3) garantiza un mínimo de 3 colores porque brewer.pal() lanza error
+# si se piden menos de 3. "Set1" es una paleta cualitativa apta para categorías.
 
 colores <- brewer.pal(max(n_st, 3), "Set1")
 
-# Se construye un data.frame que mapea nombres de muestra a sus conteos totales.
+# Se construye un data.frame de dos columnas para que ggplot pueda leerlo.
+# names(ss16S) extrae los nombres de muestra del vector.
+# ss16S aporta el total de lecturas correspondiente a cada nombre.
 
 df_reads <- data.frame(
-  Sample     = names(ss16S),
-  TotalReads = ss16S
+  Sample     = names(ss16S),   # eje x : nombre de muestra
+  TotalReads = ss16S           # eje y : conteo total de lecturas
 )
 
-# Gráfico de barras de lecturas totales por muestra, ordenadas de forma ascendente.
-# reorder(Sample, TotalReads) ordena las muestras en el eje x por conteo.
-# coord_flip() intercambia los ejes para que los nombres largos aparezcan
-# horizontalmente en el eje y.
-# scale_y_continuous(labels = comma) formatea las marcas con separador de miles.
-# scale_fill_gradientn() aplica un gradiente continuo de color (similar a Viridis).
+# ggplot() inicializa el gráfico con df_reads como fuente de datos.
+# aes() define las estéticas globales:
+#   x = reorder(Sample, TotalReads) → ordena las barras de menor a mayor lectura.
+#   y = TotalReads                  → altura de cada barra.
+#   fill = TotalReads               → el color de relleno varía según el conteo
+#                                     (gradiente continuo, no categorías).
 
 ggplot(df_reads, aes(x = reorder(Sample, TotalReads),
                      y = TotalReads,
                      fill = TotalReads)) +
-  geom_bar(stat = "identity") +          
+
+  # geom_bar(stat = "identity") dibuja barras cuya altura es exactamente el
+  # valor de y en el data.frame (no cuenta filas como haría stat = "count").
+  geom_bar(stat = "identity") +
+
+  # coord_flip() intercambia los ejes x e y. Los nombres de muestra quedan en
+  # el eje y (horizontal) y las lecturas en el eje x (vertical), evitando
+  # solapamiento de etiquetas cuando hay muchas muestras.
+  coord_flip() +
+
+  # scale_y_continuous() controla el eje de lecturas (y original, x tras el flip).
+  # labels = comma formatea los números con separador de miles (p. ej. 10,000)
+  # usando la función comma del paquete scales, mejorando la legibilidad.
+  scale_y_continuous(labels = comma) +
+
+  # scale_fill_gradientn() asigna un gradiente continuo de color al relleno.
+  # Los cuatro HEX reproducen aproximadamente la paleta Viridis:
+  #   #440154 → morado oscuro (valores bajos)
+  #   #31688e → azul medio
+  #   #35b779 → verde
+  #   #fde725 → amarillo (valores altos)
+  # Esto permite identificar visualmente qué muestras tienen más/menos lecturas.
+  scale_fill_gradientn(
+    colors = c("#440154", "#31688e", "#35b779", "#fde725")
+  ) +
+
+  # labs() define las etiquetas textuales del gráfico.
+  # title: título descriptivo mostrado en la parte superior.
+  # x / y: etiquetas de los ejes (referidos al eje tras coord_flip).
+  labs(title = "Total de Lecturas por Muestra (16S)",
+       x = "Muestra",
+       y = "Número de lecturas") +
+
+  # theme_bw() aplica un tema de fondo blanco con cuadrícula gris, más limpio
+  # que el tema gris por defecto. base_size = 11 fija el tamaño base de fuente
+  # en 11 pt; todos los textos del gráfico escalan a partir de ese valor.
+  theme_bw(base_size = 11) +
+
+  # theme() permite ajustes finos sobre el tema base.
+  # legend.position = "none" oculta la leyenda del gradiente porque el color
+  # ya es redundante con la altura de la barra; eliminarla reduce el ruido visual.
+  theme(legend.position = "none")
+
+# ggsave() guarda el último gráfico generado en disco.
+# width / height: dimensiones en pulgadas (10 × 8 da espacio para muchas muestras).
+# dpi = 300: resolución de 300 puntos por pulgada, estándar para publicación.
+ggsave("03_Results/figures/16S/lecturas-16S.png", width = 10, height = 8, dpi = 300)
+
+
+# ── ITS
+
+# Igual que ss16S pero sobre el objeto psITS (amplicón fúngico ITS).
+ssITS <- sample_sums(ps_ITS)
+
+
+summary(ssITS)
+
+
+n_st <- length(unique(sample_data(ps_ITS)$amplicon))
+
+
+colores <- brewer.pal(max(n_st, 3), "Set1")
+
+
+df_reads <- data.frame(
+  Sample     = names(ssITS),
+  TotalReads = ssITS
+)
+
+
+ggplot(df_reads, aes(x = reorder(Sample, TotalReads),
+                     y = TotalReads,
+                     fill = TotalReads)) +
+  geom_bar(stat = "identity") +
   coord_flip() +
   scale_y_continuous(labels = comma) +
   scale_fill_gradientn(
-    colors = c("#440154", "#31688e", "#35b779", "#fde725")  
+    colors = c("#440154", "#31688e", "#35b779", "#fde725")
   ) +
-  labs(title = "Total de Lecturas por Muestra (16S)",
+  labs(title = "Total de Lecturas por Muestra (ITS)",
        x = "Muestra",
        y = "Número de lecturas") +
   theme_bw(base_size = 11) +
   theme(legend.position = "none")
 
 
+
+ggsave("03_Results/figures/ITS/lecturas-ITS.png",, width = 10, height = 8, dpi = 300)
+
+# ─────────────────────────────────────────────────────────────────────────────
+
 # Filtrado por prevalencia y abundancia
+
+# ── 16S 
 
 cat("ASVs originales:", ntaxa(ps16S), "\n")
 
-# Elimina ASVs con menos de 10 lecturas totales
 # taxa_sums() devuelve las lecturas totales por ASV en todas las muestras.
 # prune_taxa() conserva solo los taxa que cumplen la condición lógica.
 # El umbral de 10 es comúnmente usado para excluir ruido de secuenciación.
@@ -211,10 +316,35 @@ cat("ASVs tras filtrado de prevalencia (≥ 5 % muestras):", ntaxa(ps16S_f), "\n
 cat("ASVs removidos en total:", ntaxa(ps16S) - ntaxa(ps16S_f), "\n")
 
 
+# ── ITS 
+
+cat("ASVs originales:", ntaxa(ps_ITS), "\n")
+
+psITS_f <- prune_taxa(taxa_sums(ps_ITS) > 10, ps_ITS)          # ← psITS, no ps16S
+cat("ASVs tras umbral de abundancia (> 10 lecturas):", ntaxa(psITS_f), "\n")
+
+prev_thr <- 0.05 * nsamples(psITS_f)                          # ← psITS_f
+
+asv <- as(otu_table(psITS_f), "matrix")                       # ← psITS_f
+
+if (!taxa_are_rows(psITS_f)) asv <- t(asv)                    # ← psITS_f
+
+taxa_prev <- rowSums(asv > 0)
+
+psITS_f <- prune_taxa(taxa_prev >= prev_thr, psITS_f)         # ← psITS_f
+
+cat("ASVs tras filtrado de prevalencia (≥ 5 % muestras):", ntaxa(psITS_f), "\n")
+cat("ASVs removidos en total:", ntaxa(ps_ITS) - ntaxa(psITS_f), "\n")   # ← psITS
+
+# ---------------------------------------------------------------------------------
+
 # Rarefacción
+
+# ── 16S
+
 # La rarefacción submuestrea cada muestra a la misma profundidad de
 # secuenciación (min_depth) para que las estimaciones de diversidad no estén
-# confundidas por diferencias en el tamaño de la biblioteca.
+# confundidas por diferencias en el tamaño.
 
 # min() de sample_sums da el menor número de lecturas entre todas las muestras.
 
@@ -239,8 +369,30 @@ ps16S_rare <- rarefy_even_depth(
 cat("Muestras tras rarefacción:", nsamples(ps16S_rare), "\n")
 cat("ASVs tras rarefacción:",     ntaxa(ps16S_rare),    "\n")
 
+# ── ITS 
+
+# Eliminar muestras con 0 lecturas (quedaron vacías tras el filtrado)
+psITS_f <- prune_samples(sample_sums(psITS_f) > 0, psITS_f)
+
+min_depth <- min(sample_sums(psITS_f))
+cat("Profundidad mínima ITS:", min_depth, "\n")
+
+psITS_rare <- rarefy_even_depth(
+  psITS_f,
+  sample.size = min_depth,
+  rngseed     = 123,
+  replace     = FALSE,
+  trimOTUs    = TRUE,
+  verbose     = FALSE
+)
+
+cat("Muestras tras rarefacción:", nsamples(psITS_rare), "\n")
+cat("ASVs tras rarefacción:",     ntaxa(psITS_rare),    "\n")
+
+# --------------------------------------------------------------------------------
 
 # Abundancias relativas
+
 # Se transforman los conteos crudos a proporciones para que las muestras con
 # diferente tamaño de biblioteca sean comparables en análisis composicionales
 # (p. ej., Bray-Curtis, gráficos de barras, PCoA).
@@ -252,6 +404,14 @@ ps16S_rel <- transform_sample_counts(ps16S_f, function(x) x / sum(x))
 # Verificación: todas las sumas de muestra deben ser iguales a 1.0.
 
 head(round(sample_sums(ps16S_rel), 4))
+
+# ── 16S
+ps16S_rel <- transform_sample_counts(ps16S_f, function(x) x / sum(x))
+head(round(sample_sums(ps16S_rel), 4))
+
+# ── ITS
+psITS_rel <- transform_sample_counts(psITS_f, function(x) x / sum(x))
+head(round(sample_sums(psITS_rel), 4))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -513,3 +673,6 @@ write.csv(as.data.frame(sample_data(ps16S_f)), "03_Results/csv/16S/metadatos.csv
 
 # alpha16S es un data.frame estándar, por lo que write.csv() funciona directamente.
 write.csv(alpha16S, "03_Results/csv/16S/diversidad_alfa.csv")
+
+# Uso de la IA: corrección de los errores no entendibles al ejecutar el código y ayuda en el
+# comentado para darle mejor estructura al texto (formato).
