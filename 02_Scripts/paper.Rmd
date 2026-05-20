@@ -1,46 +1,48 @@
 ---
-title: "Bacterioma y fungoma en *Phaseolus vulgaris*"
-author: "Samuel Solís Barrón"
-date: "`r Sys.Date()`"
-
-format:
-  html:
-    output-file: "index"
-    toc: true
-    toc-depth: 4
-    toc-title: "Contenido"
-    toc-location: left
-    number-sections: true
-    number-depth: 4
-    theme: cosmo
-    highlight-style: github
-    code-fold: false
-    code-tools: true
-    code-copy: true
-    code-overflow: wrap
-    fig-width: 9
-    fig-height: 6
-    fig-align: center
-    embed-resources: true
-    smooth-scroll: true
-    anchor-sections: true
-
-execute:
-  echo: true
-  warning: false
-  message: false
-  cache: false
-
-pdf_document:
-  toc: true
-  toc_depth: 4
-  number_sections: true
+title: Cambios en el bacterioma y fungoma de la rizosfera asociados a bacterias fijadoras de nitrógeno en *Phaseolus vulgaris*
 ---
 
-## Introdución
+## 1. Introducción
 
-## Métodos
+Las leguminosas pertenecen a la familia Fabaceae, comprenden 750 géneros, 19 300 especies (Montejano-Ramírez & Valencia-Cantero, 2024). La distribución geográfica es amplia, crecen adecuadamente en climas tropicales y húmedos, pero se adaptan en cultivos de zonas semiáridas (Majidian, 2022). El cultivo de lentejas y garbanzos deriva del Oriente Medio, en el otro extremo, regiones de Mesoamérica provienen las judías comunes con los tipos marino, negro y pinto (Majidian, 2022). 
 
-## Resultados
+Las legumbres contribuyen a la seguridad alimentaria y es la base de la dieta de la población mundial porque proporcionan alto contenido en proteínas, bajo contenido de lípidos, fuente de Fe, Zn y Ca, vitaminas como el folato y carbohidratos como la fibra dietética y almidón (Martín-Cabrejas, 2019). Las legumbres contribuyen a la mitigación del cambio climático y promueve la diversidad porque reduce los gases de efecto invernadero en la atmósfera, reduce a su vez, plagas y enfermedades al alterar el ciclo biológico de su desarrollo (Yeremko et al., 2025). 
 
-## Conclusiones
+El nitrógeno (N2) es un elemento que compone el 78.1 % de la atmósfera terrestre, pero no es asimilable en el suelo. La fijación biológica de nitrógeno es realizada por las bacterias fijadoras de nitrógeno conocidas como rizobacterias. A partir de estos microorganismos, la planta adquiere este macronutriente que compone a las proteínas, ácidos nucleicos y compuestos nitrogenados (Athul et al., 2022). 
+
+Las leguminosas establecen relaciones simbióticas con bacterias gram-negativas del filo Proteobacteria, género *Rhizobium* (Shumilina et al., 2023). Está simbiosis puede fijar entre 100 y 300 ha-1 de nitrógeno atmosférico (N2) anualmente, proporcionando 139-175 millones de toneladas de nitrógeno al suelo, reduciendo el costo de aplicar 80-90 toneladas de fertilizantes nitrogenados (Yeremko et al., 2025). La forma biodisponible del nitrógeno en el suelo es mediante los compuestos orgánicos e inorgánicos como nitratos -NO3, nitritos -NO2 y iones de amonio -NH4 (Yeremko et al., 2025). 
+
+El establecimiento de la simbiosis leguminosa-rizobios como un N2-sistema fijador está interconectado con el estado fisiológico del hospedador vegetal, determinado por la influencia de factores ambientales como el tipo de suelo, la temperatura, la humedad, el pH, la salinidad, el contenido de macronutrientes y micronutrientes.
+
+## 2. Metodología
+
+Este proyecto es una réplcia de resultados de Influence of organic plant breeding on the rhizosphere microbiome of common bean (*Phaseolus vulgaris L.*). (Park et al., 2023)
+
+### 2.1 Obtención de los datos
+
+Los datos para el análisis se obtuvieron de NCBI BioProject: RJNA988238 (Bacteria) y  PPRJNA989655 (Hongo).
+
+### 2.2 Procesamiento de variantes de secuencia de amplicón (ASV)
+
+El procesamiento del filtrado de calidad de los ASV (Q ≥ 33), procesamiento de lecturas paired-end, eliminación de las secuencias de primers y quimeras ocasionadas por el PCR utilizará DADA2 (Sahil et al., 2025). Las lecturas tendrán una filtración de 260 pb en dirección forward y 240 pb en dirección reverse, utilizando los parámetros maxN = 0, maxEE = c(2,2), truncQ = 2 y rm.phix = TRUE (Mataranyika et al., 2024). Los ASV conservados serán ≥ 270 pb (Sahil et al., 2025). La asignación taxonómica se realizará mediante alineamiento contra la base de datos SILVA v131.1 y UNITE_v2025, los niveles taxonómicos van desde el filo hasta el género conservando ≥ 99% de identidad (Overgaard et al., 2022). La rarefacción se realizó para estandarizar la comparabilidad para los cálculos de diversidad (Mataranyika et al., 2024).
+
+### 2.3 Análisis estadístico
+
+Los análisis de diversidad alfa y beta se realizarán en R utilizando el paquete phyloseq. Las diferencias entre grupos en la diversidad alfa utilizará las pruebas de Kruskal–Wallis o de rangos de Wilcoxon, mientras que los valores de p serán ajustados por comparaciones múltiples mediante el método Benjamini–Hochberg FDR (Yurgel et al., 2026). Asimismo, las diferencias entre grupos se analizarán mediante PERMANOVA (función adonis) con un máximo de 999 permutaciones (Sahil et al., 2025). Se elaborará un mapa de calor (heatmap) a partir de los coeficientes de correlación calculados utilizando el paquete pheatmap, empleando la correlación de Spearman, con el propósito de estimar la relación del bacterioma respecto a la muestra. La gráfica de la composición taxonómica se realizará con el paquete ggplot2 (Ghotbi et al., 2025).
+
+## 3. Resultados
+
+
+
+## 4. Referencias
+
+1. Ghotbi, M., Ghotbi, M., Kuzyakov, Y., & Horwath, W. R. (2025). Management and rhizosphere microbial associations modulate genetic-driven nitrogen fate. Agriculture, Ecosystems & Environment, 378, 109308. https://doi.org/10.1016/j.agee.2024.109308
+2. Mataranyika, P. N., Bez, C., Venturi, V., Chimwamurombe, P. M., & Uzabakiriho, J. D. (2024). Rhizospheric, seed, and root endophytic-associated bacteria of drought-tolerant legumes grown in arid soils of Namibia. Heliyon. https://doi.org/10.1016/j.heliyon.2024.e36718
+3. Majidian, P. (2022). Legume Breeding: From Conventional Method to Modern Technique. In J. C. Jimenez-Lopez & A. Clemente (Eds.), Legumes Research—Volume 1. IntechOpen. https://doi.org/10.5772/intechopen.101519
+4. Martín-Cabrejas, M. A. (2019). CHAPTER 1. Legumes: An Overview. In M. Á. Martín-Cabrejas (Ed.), Food Chemistry, Function and Analysis (pp. 1–18). Royal Society of Chemistry. https://doi.org/10.1039/9781788015721-00001 
+5. Montejano-Ramírez, V., & Valencia-Cantero, E. (2024). The Importance of Lentils: An Overview. Agriculture, 14(1), 103. https://doi.org/10.3390/agriculture14010103 
+6. Overgaard, C. K., Tao, K., Zhang, S., Christensen, B. T., Blahovska, Z., Radutoiu, S., Kelly, S., & Dueholm, M. K. D. (2022). Application of ecosystem-specific reference databases for increased taxonomic resolution in soil microbial profiling. Frontiers in Microbiology, 13, 942396. https://doi.org/10.3389/fmicb.2022.942396
+7. Park, H. E., Nebert, L., King, R. M., Busby, P., & Myers, J. R. (2023). Influence of organic plant breeding on the rhizosphere microbiome of common bean (Phaseolus vulgaris L.). Frontiers in Plant Science, 14. https://doi.org/10.3389/fpls.2023.1251919
+8. Sahil, R., Pal, V., Kharat, A. S., & Jain, M. (2025). A multi-omics meta-analysis of rhizosphere microbiome reveals growth-promoting marker bacteria at different stages of legume development. Plant, Cell & Environment. https://doi.org/10.1111/pce.15429
+9. Yeremko, L., Czopek, K., Staniak, M., Marenych, M., & Hanhur, V. (2025). Role of Environmental Factors in Legume-Rhizobium Symbiosis: A Review. Biomolecules, 15(1), 118. https://doi.org/10.3390/biom15010118  
+10. Yurgel, S. N., Miklas, P. N., & Porter, L. D. (2026). Nitrogen fixation, crop production and bacterial communities of common bean cultivars: A 77-year breeding perspective. Plant and Soil, 520, 1-17. https://doi.org/10.1007/s11104-025-08257-x
