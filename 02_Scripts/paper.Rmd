@@ -34,6 +34,7 @@ Los análisis de diversidad alfa y beta se realizarán en R utilizando el paquet
 
 
 
+
 ## 4. Referencias
 
 1. Ghotbi, M., Ghotbi, M., Kuzyakov, Y., & Horwath, W. R. (2025). Management and rhizosphere microbial associations modulate genetic-driven nitrogen fate. Agriculture, Ecosystems & Environment, 378, 109308. https://doi.org/10.1016/j.agee.2024.109308

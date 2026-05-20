@@ -45,6 +45,9 @@
 # install.packages(c("ggplot2", "vegan", "scales",
 #                   "RColorBrewer", "ggpubr", "knitr"))
 
+# Se establece una semilla aleatoria para que sea reproducibles entre ejecuciones.
+set.seed(123)
+
 # ─────────────────────────────────────────────────────────────────────────────
 
 # 2. CARGA DE LIBRERIAS
@@ -93,6 +96,7 @@ metadataITS$amplicon <- "ITS"
 # rbind() ("row bind") apila dos data.frames uno encima del otro por filas,
 # combinando ambas tablas de metadatos en una sola. Las columnas deben coincidir.
 # Resultado: un único data.frame con todas las muestras de ambos amplicones.
+
 
 metadata <- rbind(metadata16S, metadataITS)
 
@@ -476,7 +480,6 @@ head(sample.names18S)
 saveRDS(cutFs18S, file = "03_Results/rds/ITS/cutFsITS.RDS")
 saveRDS(cutRs18S, file = "03_Results/rds/ITS/cutRsITS.RDS")
 
-# Punto de reanudación.
 cutFs18S <- readRDS("03_Results/rds/ITS/cutFsITS.RDS")
 cutRs18S <- readRDS("03_Results/rds/ITS/cutRsITS.RDS")
 
@@ -575,9 +578,6 @@ asv16S <- filterAndTrim(
   multithread = TRUE
 )
 
-# Filtrado de calidad para lecturas ITS/18S con los mismos parámetros.
-# CORRECCIÓN: el original pasaba fnFsITS/fnRsITS (archivos crudos) como entrada,
-# en lugar de los archivos recortados cutFs18S/cutRs18S. Corregido aquí.
 asvITS <- filterAndTrim(
   cutFs18S, filtFsITS,
   cutRs18S, filtRsITS,
@@ -600,10 +600,8 @@ asvITS <- readRDS("03_Results/rds/ITS/asvITS.RDS")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+
 # 9. APRENDIZAJE DEL MODELO DE ERRORES
-# ─────────────────────────────────────────────────────────────────────────────
-# Las líneas activas cargan modelos de error pre-calculados desde disco.
-# Descomentar los pares learnErrors() + saveRDS() para calcularlos desde cero.
 
 # learnErrors() estima las tasas de error de secuenciación de Illumina a partir
 # de las lecturas filtradas. DADA2 modela la probabilidad de que una base
@@ -612,23 +610,23 @@ asvITS <- readRDS("03_Results/rds/ITS/asvITS.RDS")
 
 # Modelo de error forward del 16S (cargado desde RDS pre-calculado)
 errF16S <- readRDS("03_Results/rds/16S/errF16S.RDS")
-# errF16S <- learnErrors(filtFs16S, multithread = TRUE)
-# saveRDS(errF16S, file = "03_Results/rds/16S/errF16S.RDS")
+errF16S <- learnErrors(filtFs16S, multithread = TRUE)
+saveRDS(errF16S, file = "03_Results/rds/16S/errF16S.RDS")
 
 # Modelo de error reverse del 16S
 errR16S <- readRDS("03_Results/rds/16S/errR16S.RDS")
-# errR16S <- learnErrors(filtRs16S, multithread = TRUE)
-# saveRDS(errR16S, file = "03_Results/rds/16S/errR16S.RDS")
+errR16S <- learnErrors(filtRs16S, multithread = TRUE)
+saveRDS(errR16S, file = "03_Results/rds/16S/errR16S.RDS")
 
 # Modelo de error forward del ITS
 errFITS <- readRDS("03_Results/rds/ITS/errFITS.RDS")
-# errFITS <- learnErrors(filtFsITS, multithread = TRUE)
-# saveRDS(errFITS, file = "03_Results/rds/ITS/errFITS.RDS")
+errFITS <- learnErrors(filtFsITS, multithread = TRUE)
+saveRDS(errFITS, file = "03_Results/rds/ITS/errFITS.RDS")
 
 # Modelo de error reverse del ITS
 errRITS <- readRDS("03_Results/rds/ITS/errRITS.RDS")
-# errRITS <- learnErrors(filtRsITS, multithread = TRUE)
-# saveRDS(errRITS, file = "03_Results/rds/ITS/errRITS.RDS")
+errRITS <- learnErrors(filtRsITS, multithread = TRUE)
+saveRDS(errRITS, file = "03_Results/rds/ITS/errRITS.RDS")
 
 # plotErrors() visualiza el modelo de error aprendido.
 # Los puntos son las tasas observadas; la línea es el ajuste del modelo.
@@ -654,13 +652,14 @@ dev.off()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+
 # 10. INFERENCIA DE ASVs Y FUSIÓN DE PARES
-# ─────────────────────────────────────────────────────────────────────────────
 
 # dada() aplica el algoritmo de denoising de DADA2 a las lecturas filtradas,
 # usando el modelo de error aprendido para distinguir variantes reales de errores.
 # Se ejecuta por separado para lecturas forward y reverse.
 # El resultado es un objeto dada con las variantes de secuencia de amplicón (ASVs).
+
 dadaFs16S <- dada(filtFs16S, err = errF16S, multithread = TRUE)
 dadaRs16S <- dada(filtRs16S, err = errR16S, multithread = TRUE)
 dadaFsITS <- dada(filtFsITS, err = errFITS, multithread = TRUE)
@@ -669,59 +668,68 @@ dadaRsITS <- dada(filtRsITS, err = errRITS, multithread = TRUE)
 # mergePairs() fusiona las lecturas forward y reverse denoiseadas en secuencias
 # de longitud completa. Requiere que las lecturas se superpongan suficientemente.
 # Se carga desde RDS; descomentar para recalcular.
-# mergers16S <- mergePairs(dadaFs16S, filtFs16S, dadaRs16S, filtRs16S, verbose = TRUE)
-# saveRDS(mergers16S, file = "03_Results/rds/16S/mergers16S.RDS")
+
+mergers16S <- mergePairs(dadaFs16S, filtFs16S, dadaRs16S, filtRs16S, verbose = TRUE)
+saveRDS(mergers16S, file = "03_Results/rds/16S/mergers16S.RDS")
 mergers16S <- readRDS("03_Results/rds/16S/mergers16S.RDS")
 
 # makeSequenceTable() construye la tabla de secuencias (ASV table):
 # filas = muestras, columnas = secuencias de ASV, valores = número de lecturas.
 # Esta es la tabla central del análisis, equivalente a una OTU table.
+
 seqtab16S <- makeSequenceTable(mergers16S)
 
 # Mismo procedimiento para ITS.
-# mergersITS <- mergePairs(dadaFsITS, filtFsITS, dadaRsITS, filtRsITS, verbose = TRUE)
-# saveRDS(mergersITS, file = "03_Results/rds/ITS/mergersITS.RDS")
+
+mergersITS <- mergePairs(dadaFsITS, filtFsITS, dadaRsITS, filtRsITS, verbose = TRUE)
+saveRDS(mergersITS, file = "03_Results/rds/ITS/mergersITS.RDS")
 mergersITS <- readRDS("03_Results/rds/ITS/mergersITS.RDS")
+
 seqtabITS <- makeSequenceTable(mergersITS)
 
-# dim(seqtab16S) mostraría [n_muestras × n_ASVs] — útil para inspección.
-# saveRDS(seqtab16S, file = "03_Results/rds/16S/seqtab16S.RDS")
+dim(seqtab16S)  # mostraría [n_muestras × n_ASVs] — útil para inspección.
+saveRDS(seqtab16S, file = "03_Results/rds/16S/seqtab16S.RDS")
 seqtab16S <- readRDS("03_Results/rds/16S/seqtab16S.RDS")
 
-# dim(seqtabITS)
-# saveRDS(seqtabITS, file = "03_Results/rds/ITS/seqtabITS.RDS")
+dim(seqtabITS)
+saveRDS(seqtabITS, file = "03_Results/rds/ITS/seqtabITS.RDS")
 seqtabITS <- readRDS("03_Results/rds/ITS/seqtabITS.RDS")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+
 # 11. ELIMINACIÓN DE QUIMERAS
-# ─────────────────────────────────────────────────────────────────────────────
 
 # removeBimeraDenovo() elimina secuencias quiméricas (bimeras) de la tabla de ASVs.
 # Las quimeras son artefactos de PCR formados por la fusión de dos secuencias reales.
 # method = "consensus" requiere que la quimera sea reconocida como tal en la
 # mayoría de las muestras antes de eliminarla.
 # verbose = TRUE imprime el número de bimeras detectadas y eliminadas.
+
 seqtab.nochim16S <- removeBimeraDenovo(seqtab16S, method = "consensus",
                                         multithread = TRUE, verbose = TRUE)
-# Calcular la fracción de lecturas conservadas después de eliminar quimeras.
+
+# Calcular las lecturas conservadas después de eliminar las quimeras.
 # sum(seqtab.nochim16S) / sum(seqtab16S): si este valor es bajo (< 0.7),
 # puede indicar un problema con los primers o el protocolo de librería.
+
 cat("Fraccion de lecturas 16S conservadas:",
     round(sum(seqtab.nochim16S) / sum(seqtab16S), 4), "\n")
 
 seqtab.nochimITS <- removeBimeraDenovo(seqtabITS, method = "consensus",
                                         multithread = TRUE, verbose = TRUE)
+
 cat("Fraccion de lecturas ITS conservadas:",
     round(sum(seqtab.nochimITS) / sum(seqtabITS), 4), "\n")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+
 # 12. TABLA DE SEGUIMIENTO DE LECTURAS
-# ─────────────────────────────────────────────────────────────────────────────
 
 # Función auxiliar: getUniques() extrae las secuencias únicas de un objeto DADA2;
 # sum() suma sus abundancias para obtener el total de lecturas en ese objeto.
+
 getN <- function(x) sum(getUniques(x))
 
 # cbind() ("column bind") une columnas para construir la tabla de seguimiento 16S.
@@ -731,6 +739,7 @@ getN <- function(x) sum(getUniques(x))
 #   sapply(dadaRs16S)  — después del denoising reverse
 #   sapply(mergers16S) — después de la fusión de pares
 #   rowSums(...)       — después de la eliminación de quimeras
+
 track16S <- cbind(
   asv16S,
   sapply(dadaFs16S,  getN),
@@ -738,15 +747,19 @@ track16S <- cbind(
   sapply(mergers16S, getN),
   rowSums(seqtab.nochim16S)
 )
+
 # colnames() y rownames() asignan etiquetas a columnas y filas de la matriz.
+
 colnames(track16S) <- c("input", "filtered", "denoisedF",
                          "denoisedR", "merged", "nonchim")
+
 rownames(track16S) <- samples.names16S
 
 head(track16S)
+
 write.csv(track16S, "03_Results/csv/16S/track16S.csv")
 
-# Lo mismo para ITS.
+
 trackITS <- cbind(
   asvITS,
   sapply(dadaFsITS,  getN),
@@ -754,72 +767,79 @@ trackITS <- cbind(
   sapply(mergersITS, getN),
   rowSums(seqtab.nochimITS)
 )
+
 colnames(trackITS) <- c("input", "filtered", "denoisedF",
                          "denoisedR", "merged", "nonchim")
+
 rownames(trackITS) <- samples.namesITS
 
 head(trackITS)
+
 write.csv(trackITS, "03_Results/csv/ITS/trackITS.csv")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 13. ASIGNACIÓN TAXONÓMICA — Bayesiano ingenuo de DADA2 (assignTaxonomy / addSpecies)
-# ─────────────────────────────────────────────────────────────────────────────
 
-# ── 16S — base de datos SILVA ────────────────────────────────────────────────
+# 13. ASIGNACIÓN TAXONÓMICA
 
 # assignTaxonomy() clasifica las secuencias de ASV contra una base de datos de
 # referencia usando el clasificador bayesiano ingenuo de Wang et al. (2007).
 # Devuelve una matriz con la clasificación hasta género para cada ASV.
 # El archivo .fa.gz es el conjunto de entrenamiento de SILVA v138.1.
+
 taxa16S <- assignTaxonomy(seqtab.nochim16S,
                            "01_RawData/silva/silva_nr99_v138.1_train_set.fa.gz",
                            multithread = TRUE)
 
 # addSpecies() extiende la clasificación hasta nivel de especie mediante
 # asignación exacta de la secuencia completa contra la base de datos de especies.
+
 taxa16S <- addSpecies(taxa16S,
                        "01_RawData/silva/silva_species_assignment_v138.1.fa.gz")
 
 saveRDS(taxa16S, file = "03_Results/rds/16S/taxa16S.RDS")
 
 # Crear una copia sin nombres de fila (secuencias de ADN) para imprimir limpio.
+
 taxa16S.print <- taxa16S
 rownames(taxa16S.print) <- NULL  # NULL elimina los nombres de fila
 head(taxa16S.print)
 
-# ── ITS — base de datos UNITE ────────────────────────────────────────────────
+# ITS — base de datos UNITE
 # Descargar desde https://unite.ut.ee/repository.php
 # multithread = FALSE porque la base de UNITE es generalmente más pequeña.
+
 taxa_ITS <- assignTaxonomy(seqtab.nochimITS,
-                             "01_RawData/unite_general_release.fasta.gz",
+                             "01_RawData/silva/unite_general_release.fasta.gz",
                              multithread = FALSE)
 saveRDS(taxa_ITS, file = "03_Results/rds/ITS/taxaITS.RDS")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 14. ASIGNACIÓN TAXONÓMICA CON DECIPHER (IdTaxa)
-# ─────────────────────────────────────────────────────────────────────────────
 
-# ── 14a. 16S — conjunto de entrenamiento SILVA ────────────────────────────────
+# 14. ASIGNACIÓN TAXONÓMICA CON DECIPHER (IdTaxa)
 
 # getSequences() extrae las secuencias de los ASVs de la tabla seqtab.
 # DNAStringSet() convierte el vector de secuencias en un objeto de Biostrings,
 # que es el formato requerido por IdTaxa().
+
 dna16S <- DNAStringSet(getSequences(seqtab.nochim16S))
 
 # load() carga un archivo .RData que contiene el objeto "trainingSet" de SILVA.
 # Este objeto es el clasificador pre-entrenado de DECIPHER para 16S.
+
 load("01_RawData/silva/SILVA_SSU_r138_2019.RData")
 
 # IdTaxa() clasifica las secuencias usando el enfoque probabilístico de DECIPHER,
 # que generalmente es más preciso que el clasificador bayesiano a nivel de género.
 # strand = "top" analiza solo la cadena tal como está (sin probar el reverso-complemento).
 # processors = NULL usa todos los núcleos disponibles.
+
 ids16S <- IdTaxa(dna16S, trainingSet,
                  strand = "top", processors = NULL, verbose = FALSE)
 
 # Vector de rangos taxonómicos esperados en el resultado de IdTaxa.
+
 ranks <- c("domain", "phylum", "class", "order", "family", "genus", "species")
 
 # IdTaxa devuelve una lista; este sapply() la convierte en una matriz:
@@ -827,6 +847,7 @@ ranks <- c("domain", "phylum", "class", "order", "family", "genus", "species")
 # x$taxon[m] extrae el nombre del taxón en cada rango en el orden correcto.
 # Las asignaciones "unclassified_*" se reemplazan por NA para consistencia.
 # t() transpone la matriz para que quede como filas = ASVs, columnas = rangos.
+
 taxid16S <- t(sapply(ids16S, function(x) {
   m    <- match(ranks, x$rank)
   taxa <- x$taxon[m]
@@ -835,24 +856,26 @@ taxid16S <- t(sapply(ids16S, function(x) {
 }))
 
 # Nombrar columnas (rangos) y filas (secuencias de ASV) de la matriz resultante.
+
 colnames(taxid16S) <- ranks
 rownames(taxid16S) <- getSequences(seqtab.nochim16S)
 
 saveRDS(taxid16S, file = "03_Results/rds/16S/taxid16S-decipher.RDS")
 taxid16S <- readRDS("03_Results/rds/16S/taxid16S-decipher.RDS")
 
-# ── 14b. ITS — conjunto de entrenamiento UNITE ────────────────────────────────
-
 # Mismo procedimiento que para el 16S, usando el clasificador UNITE para hongos.
+
 dnaITS <- DNAStringSet(getSequences(seqtab.nochimITS))
 
 # Carga el objeto trainingSet de UNITE v2025 (reemplaza el trainingSet de SILVA).
+
 load("01_RawData/silva/UNITE_v2025.RData")
 
 idsITS <- IdTaxa(dnaITS, trainingSet,
                  strand = "top", processors = NULL, verbose = FALSE)
 
 # Misma conversión de lista a matriz que para el 16S.
+
 taxidITS <- t(sapply(idsITS, function(x) {
   m    <- match(ranks, x$rank)
   taxa <- x$taxon[m]
@@ -861,6 +884,7 @@ taxidITS <- t(sapply(idsITS, function(x) {
 }))
 
 colnames(taxidITS) <- ranks
+
 rownames(taxidITS) <- getSequences(seqtab.nochimITS)
 
 saveRDS(taxidITS, file = "03_Results/rds/ITS/taxidITS_decipher.RDS")
