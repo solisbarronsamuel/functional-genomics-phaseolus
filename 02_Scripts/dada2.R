@@ -43,7 +43,7 @@
 #   knitr        — generación de reportes reproducibles.
 
 # install.packages(c("ggplot2", "vegan", "scales",
-#                   "RColorBrewer", "ggpubr", "knitr"))
+#                   "RColorBrewer", "ggpubr", "knitr", "here"))
 
 # Se establece una semilla aleatoria para que sea reproducibles entre ejecuciones.
 set.seed(123)
@@ -66,6 +66,7 @@ library(ggpubr)       # utilidades de publicación para ggplot2.
 library(scales)       # funciones auxiliares para formatos de ejes.
 library(knitr)        # genera tablas formateadas en HTML/PDF dentro de reportes.
 library(DECIPHER)     # clasificador IdTaxa.
+library(here)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

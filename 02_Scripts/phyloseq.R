@@ -273,7 +273,7 @@ ggplot(df_reads, aes(x = reorder(Sample, TotalReads),
 
 
 
-ggsave("03_Results/figures/ITS/lecturas-ITS.png",, width = 10, height = 8, dpi = 300)
+ggsave("03_Results/figures/ITS/lecturas-ITS.png", width = 10, height = 8, dpi = 300)
 
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -418,7 +418,9 @@ head(round(sample_sums(psITS_rel), 4))
 
 # 5.  ANÁLISIS DE DIVERSIDAD
 
-# Diversidad Alfa
+
+# ------- Diversidad Alfa -----------------------
+
 # La diversidad alfa cuantifica la diversidad DENTRO de una sola muestra.
 # Índices utilizados:
 #   Observed   – conteo de ASVs presentes
@@ -428,17 +430,22 @@ head(round(sample_sums(psITS_rel), 4))
 #                pertenezcan a ASVs diferentes
 #   InvSimpson – 1/Simpson; valor mayor = más diverso
 
+# ── 16S 
+
 # estimate_richness() calcula todos los índices solicitados sobre el objeto
 # rarefaccionado para garantizar una comparación justa entre muestras.
+
 alpha16S <- estimate_richness(
   ps16S_rare,
   measures = c("Observed", "Chao1", "Shannon", "Simpson", "InvSimpson")
 )
 
 # Se guardan los nombres de muestra como columna para fusionado/graficado posterior.
+
 alpha16S$Sample <- rownames(alpha16S)
 
 # Se muestran las primeras 8 filas como tabla formateada.
+
 kable(head(alpha16S[, c("Sample","Observed","Chao1","Shannon","Simpson")], 8),
       digits  = 3,
       caption = "Índices de diversidad alfa — bacterioma 16S")
@@ -447,6 +454,7 @@ kable(head(alpha16S[, c("Sample","Observed","Chao1","Shannon","Simpson")], 8),
 # x = "Run" coloca las muestras en el eje x agrupadas por ID de corrida.
 # measures selecciona qué índices mostrar como facetas.
 # geom_point() superpone puntos individuales sobre el gráfico de tiras por defecto.
+
 plot_richness(ps16S_rare, x = "Run",
               measures = c("Shannon", "InvSimpson")) +
   geom_point(size = 3, color = "#e41a1c") +
@@ -455,15 +463,56 @@ plot_richness(ps16S_rare, x = "Run",
   theme_bw(base_size = 11) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+ggsave("03_Results/figures/16S/diversidad-alfa-16S.png", width = 10, height = 8, dpi = 300)
 
-# ==== 5b.  Diversidad Beta ====
+
+# ── ITS 
+
+# estimate_richness() calcula todos los índices solicitados sobre el objeto
+# rarefaccionado para garantizar una comparación justa entre muestras.
+
+alphaITS <- estimate_richness(
+  psITS_rare,
+  measures = c("Observed", "Chao1", "Shannon", "Simpson", "InvSimpson")
+)
+
+# Se guardan los nombres de muestra como columna para fusionado/graficado posterior.
+
+alphaITS$Sample <- rownames(alphaITS)
+
+# Se muestran las primeras 8 filas como tabla formateada.
+
+kable(head(alphaITS[, c("Sample","Observed","Chao1","Shannon","Simpson")], 8),
+      digits  = 3,
+      caption = "Índices de diversidad alfa — fungoma ITS")
+
+# plot_richness() es la función integrada de phyloseq para graficar diversidad alfa.
+# x = "Run" coloca las muestras en el eje x agrupadas por ID de corrida.
+# measures selecciona qué índices mostrar como facetas.
+# geom_point() superpone puntos individuales sobre el gráfico de tiras por defecto.
+
+plot_richness(psITS_rare, x = "Run",
+              measures = c("Shannon", "InvSimpson")) +
+  geom_point(size = 3, color = "#4daf4a") +
+  labs(title = "Diversidad Alfa — Fungoma (ITS)",
+       x = NULL, y = "Índice de Diversidad") +
+  theme_bw(base_size = 11) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggsave("03_Results/figures/ITS/diversidad-alfa-ITS.png", width = 10, height = 8, dpi = 300)
+
+
+# ------- Diversidad Beta -----------------------
+
 # La diversidad beta mide las diferencias en COMPOSICIÓN microbiana ENTRE muestras.
 
-# --- Disimilitud de Bray-Curtis ---
+# Disimilitud de Bray-Curtis -----------
+
 # phyloseq::distance() calcula la disimilitud por pares.
 # method = "bray": Bray-Curtis (0 = idénticos, 1 = completamente diferentes).
 # Se usa el objeto de abundancias relativas para que el tamaño de la biblioteca
 # no sesgue las distancias.
+
 dist_bray16S <- phyloseq::distance(ps16S_rel, method = "bray")
 cat("Dimensiones Bray-Curtis:", attr(dist_bray16S, "Size"), "x",
     attr(dist_bray16S, "Size"), "\n")

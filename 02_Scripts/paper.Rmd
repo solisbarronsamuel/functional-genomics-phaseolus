@@ -42,14 +42,24 @@ library(knitr)
 ```
 
 ```{r, echo=FALSE, out.width="60%"}
-knitr::include_graphics("03_Results/figures/16S/lecturas-16S.png")
+# chunk at line 44–46
+knitr::include_graphics("../03_Results/figures/16S/lecturas-16S.png")
+
+# chunk at line 48–50
+knitr::include_graphics("../03_Results/figures/ITS/lecturas-ITS.png")
 ```
+
+La diversidad alfa del bacterioma indica el índice de Shannon que la mayoría de las muestras presenta diversidad. El InvSimpson resultó que no hay dominancia de especies.
+
+La diversidad alfa en el fungoma, el índice de Shannon la mayoría de las muestras tiene una diversidad moderada con uniformidad de muestras. El InvSimpson la mayoría de las muestras tiene una comunidad equitativa.
 
 ```{r, echo=FALSE, out.width="60%"}
-knitr::include_graphics("03_Results/figures/ITS/lecturas-ITS.png")
+# chunk at line 44–46
+knitr::include_graphics("../03_Results/figures/16S/diversidad-alfa-16S.png")
+
+# chunk at line 48–50
+knitr::include_graphics("../03_Results/figures/ITS/diversidad-alfa-ITS.png")
 ```
-
-
 
 
 ## 4. Referencias
