@@ -47,22 +47,22 @@
 
 # ─────────────────────────────────────────────────────────────────────────────
 
-# 2. CARGA DE PAQUETES
+# 2. CARGA DE LIBRERIAS
 
 # library() carga cada paquete instalado en la sesión activa de R.
 
-library(dada2)        # funciones del pipeline DADA2
-library(ShortRead)    # lectura/escritura de FASTQ
-library(DESeq2)       # abundancia diferencial
-library(Biostrings)   # operaciones sobre cadenas de ADN
-library(phyloseq)     # estructuras de datos para microbiomas
-library(vegan)        # ecología de comunidades
-library(ggplot2)      # gráficos
-library(RColorBrewer) # paletas de colores
-library(ggpubr)       # utilidades de publicación para ggplot2
-library(scales)       # transformaciones de escalas
-library(knitr)        # reportes reproducibles
-library(DECIPHER)     # clasificador IdTaxa
+library(dada2)        # funciones del pipeline DADA2.
+library(ShortRead)    # lectura/escritura de FASTQ.
+library(DESeq2)       # abundancia diferencial.
+library(Biostrings)   # operaciones sobre cadenas de ADN.
+library(phyloseq)     # estructuras de datos para microbiomas.
+library(vegan)        # ecología de comunidades.
+library(ggplot2)      # visualización de gráficos.
+library(RColorBrewer) # paletas de colores para gráficos.
+library(ggpubr)       # utilidades de publicación para ggplot2.
+library(scales)       # funciones auxiliares para formatos de ejes.
+library(knitr)        # genera tablas formateadas en HTML/PDF dentro de reportes.
+library(DECIPHER)     # clasificador IdTaxa.
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -152,24 +152,26 @@ fnRs16S <- sort(list.files(path16S, pattern = "_2.fastq", full.names = TRUE))
 fnFsITS <- sort(list.files(pathITS, pattern = "_1.fastq", full.names = TRUE))
 fnRsITS <- sort(list.files(pathITS, pattern = "_2.fastq", full.names = TRUE))
 
-# Vector de caracteres con los IDs SRR de las muestras control/parentales
+# Vector de caracteres con los IDs SRR de las muestras control
 # que deben excluirse del análisis para evitar sesgo.
 
 remove_ids <- c(
-  "SRR25070675",   # control / parental 16S
-  "SRR25070676",   # control / parental 16S
-  "SRR25100830",   # control / parental ITS
-  "SRR25100831"    # control / parental ITS
+  "SRR25070675",   # control 16S
+  "SRR25070676",   # control 16S
+  "SRR25100830",   # control ITS
+  "SRR25100831"    # control ITS
 )
 
 # paste(..., collapse = "|") une los IDs con el separador "|" (operador OR en
 # expresiones regulares), creando un patrón como "ID1|ID2|ID3|ID4".
 # Así, grepl() podrá encontrar cualquiera de los IDs en una sola búsqueda.
+
 patron <- paste(remove_ids, collapse = "|")
 
-# grepl(patron, vector) devuelve TRUE para cada ruta que contiene algún ID de
+# grepl(patron) devuelve TRUE para cada ruta que contiene algún ID de
 # control. El operador ! invierte el resultado, y la indexación [] conserva
 # solo las rutas que NO corresponden a controles.
+
 fnFs16S <- fnFs16S[!grepl(patron, fnFs16S)]
 fnRs16S <- fnRs16S[!grepl(patron, fnRs16S)]
 fnFsITS <- fnFsITS[!grepl(patron, fnFsITS)]
@@ -179,47 +181,55 @@ fnRsITS <- fnRsITS[!grepl(patron, fnRsITS)]
 # strsplit(..., "_") divide el nombre en partes usando "_" como separador.
 # `[`(1) extrae el primer elemento (el acceso SRR), que es el nombre de muestra.
 # sapply() aplica esto a cada elemento del vector y devuelve un vector de nombres.
+
 samples.names16S <- sapply(strsplit(basename(fnFs16S), "_"), `[`, 1)
 samples.namesITS <- sapply(strsplit(basename(fnFsITS), "_"), `[`, 1)
 
 # length() devuelve cuántos elementos tiene el vector; se reporta para confirmar
 # que la exclusión de controles fue correcta.
+
 cat("Muestras 16S:", length(samples.names16S), "\n")
 cat("Muestras ITS:", length(samples.namesITS),  "\n")
 
 # Imprime los vectores de nombres en la consola para inspección visual.
+
 samples.names16S
 samples.namesITS
 
-# saveRDS() serializa un objeto de R en un archivo binario .RDS en disco.
+# saveRDS() serializa un objeto de R en un archivo binario .RDS en el directorio.
 # Esto permite recuperarlo exactamente igual en sesiones futuras sin recalcular.
+
 saveRDS(samples.names16S, file = "03_Results/rds/16S/samples.names16S.RDS")
-# CORRECCIÓN: la ruta original apuntaba incorrectamente a /16S/ en lugar de /ITS/
 saveRDS(samples.namesITS, file = "03_Results/rds/ITS/samples.namesITS.RDS")
 
 # readRDS() carga el objeto guardado de vuelta a la sesión.
 # Útil para retomar el análisis desde este punto sin volver a ejecutar lo anterior.
+
 samples.names16S <- readRDS("03_Results/rds/16S/samples.names16S.RDS")
-# CORRECCIÓN: ruta corregida de /16S/ a /ITS/
 samples.namesITS <- readRDS("03_Results/rds/ITS/samples.namesITS.RDS")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 5. ELIMINACIÓN DE PRIMERS CON CUTADAPT — 16S V4-V5 (515F / 926R)
-# ─────────────────────────────────────────────────────────────────────────────
 
-# ── 5a. Definir secuencias de primers ────────────────────────────────────────
+# 5. ELIMINACIÓN DE PRIMERS CON CUTADAPT — 16S V4-V5 (515F / 926R)
+
+# Script utilizado de la página web: https://benjjneb.github.io/dada2/tutorial.html
+# Los primers fueron seleccionado de acuerdo a lo publicado en este paper: 
+# https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0212355
+
+# Definir secuencias de primers:
 
 # Secuencia del primer forward 515F para la región V4-V5 del gen 16S rRNA.
 # Las letras IUPAC ambiguas (Y, M) representan mezclas de bases en la posición.
+
 FWD.16S <- "GTGYCAGCMGCCGCGGTAA"
-# Secuencia del primer reverse 926R.
 REV.16S <- "CCGYCAATTYMTTTRAGTTT"
 
 # Función auxiliar: genera las cuatro orientaciones posibles de un primer
 # (Forward, Complemento, Reverso, Reverso-Complemento) como cadenas de texto.
 # Esto es necesario porque los primers pueden aparecer en cualquier orientación
 # dentro de las lecturas según la química de la librería.
+
 allOrients <- function(primer) {
   require(Biostrings)          # asegura que Biostrings esté disponible
   dna <- DNAString(primer)     # convierte la cadena de texto en objeto DNAString
