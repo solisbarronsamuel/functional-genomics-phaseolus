@@ -1,4 +1,4 @@
-# Cambios en el bacterioma de la rizosfera asociados a bacterias fijadoras de nitrógeno en *Phaseolus vulgaris*
+# Cambios en el bacterioma y fungoma de la rizosfera asociados a bacterias fijadoras de nitrógeno en *Phaseolus vulgaris*
 
 Samuel Solís Barrón
 
