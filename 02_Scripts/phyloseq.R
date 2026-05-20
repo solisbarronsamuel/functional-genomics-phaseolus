@@ -506,62 +506,97 @@ ggsave("03_Results/figures/ITS/diversidad-alfa-ITS.png", width = 10, height = 8,
 
 # La diversidad beta mide las diferencias en COMPOSICIÓN microbiana ENTRE muestras.
 
-# Disimilitud de Bray-Curtis -----------
+# Disimilitud de Bray-Curtis
 
-# phyloseq::distance() calcula la disimilitud por pares.
-# method = "bray": Bray-Curtis (0 = idénticos, 1 = completamente diferentes).
-# Se usa el objeto de abundancias relativas para que el tamaño de la biblioteca
-# no sesgue las distancias.
+# ── 16S 
 
-dist_bray16S <- phyloseq::distance(ps16S_rel, method = "bray")
+# Verificar dimensiones de la matriz de distancias
+# attr(..., "Size") extrae el atributo "Size" del objeto dist, que indica
+# cuántas muestras contiene. Una matriz de distancias es simétrica, por lo
+# que se imprime como n × n.
+
 cat("Dimensiones Bray-Curtis:", attr(dist_bray16S, "Size"), "x",
     attr(dist_bray16S, "Size"), "\n")
 
-# --- PCoA (Análisis de Coordenadas Principales) ---
-# ordinate() envuelve varios métodos de ordenación. PCoA (= MDS) encuentra ejes
-# que maximizan la varianza explicada en la matriz de distancias.
+# PCoA (Análisis de Coordenadas Principales)
+# ordinate() proyecta la matriz de distancias Bray-Curtis en un espacio
+# euclídeo de menor dimensión. PCoA maximiza la varianza explicada en los
+# primeros ejes, facilitando la visualización de patrones entre muestras.
+
 ord_bray16S <- ordinate(ps16S_rel, method = "PCoA", distance = dist_bray16S)
 
-# Se extraen los autovalores para calcular el % de varianza explicada por cada eje.
+# Varianza explicada por eje
+# $values$Eigenvalues extrae los autovalores de la ordenación PCoA.
+# Cada autovalor representa la varianza capturada por su eje correspondiente.
+
 eig16S <- ord_bray16S$values$Eigenvalues
 
-# Cada autovalor se divide entre el total para obtener proporciones; × 100.
+# Se divide cada autovalor entre la suma total para obtener la proporción de
+# varianza explicada, multiplicando por 100 para expresarla en porcentaje.
+# round(..., 1) redondea a un decimal para facilitar la lectura.
+
 var16S <- round(eig16S / sum(eig16S) * 100, 1)
 cat("Eje 1:", var16S[1], "% | Eje 2:", var16S[2], "%\n")
 
-# plot_ordination() crea un ggplot con las puntuaciones de muestra en los ejes.
-# paste0() inserta el % de varianza en las etiquetas de eje como contexto.
-plot_ordination(ps16S_rel, ord_bray16S) +
+# Gráfico PCoA
+# plot_ordination() genera un ggplot con las puntuaciones de cada muestra
+# sobre los dos primeros ejes de la ordenación.
+# geom_point() dibuja un punto por muestra; alpha = 0.9 añade ligera
+# transparencia para distinguir puntos solapados.
+# paste0() inserta el porcentaje de varianza en las etiquetas de los ejes
+# para que el lector sepa cuánta información representa cada dimensión.
+
+pcoa_16S <- plot_ordination(ps16S_rel, ord_bray16S) +
   geom_point(size = 4, alpha = 0.9, color = "#377eb8") +
   labs(title = "PCoA — Bray-Curtis (16S)",
        x = paste0("PCoA1 [", var16S[1], "%]"),
        y = paste0("PCoA2 [", var16S[2], "%]")) +
   theme_bw(base_size = 12)
 
-# --- NMDS (Escalamiento Multidimensional No Métrico) ---
-# NMDS es una ordenación basada en rangos: preserva el ORDEN de las distancias
-# en lugar de sus valores exactos, lo que lo hace más robusto ante
-# no-linealidades. Un valor de estrés < 0.20 indica representación 2D adecuada.
-ord_nmds16S <- ordinate(ps16S_rel, method = "NMDS", distance = "bray")
-cat("Stress NMDS:", round(ord_nmds16S$stress, 4), "\n")
+ggsave("03_Results/figures/16S/pcoa-16S.png",
+       plot   = pcoa_16S,
+       width  = 8,
+       height = 6,
+       dpi    = 300)
 
-# annotate() añade una capa de texto en una posición fija del gráfico.
-# Inf / -Inf posiciona el texto en la esquina derecha inferior.
-# hjust / vjust ajustan la alineación respecto a ese punto de anclaje.
-plot_ordination(ps16S_rel, ord_nmds16S) +
-  geom_point(size = 4, alpha = 0.9, color = "#e41a1c") +
-  annotate("text", x = Inf, y = -Inf,
-           label = paste("Stress =", round(ord_nmds16S$stress, 3)),
-           hjust = 1.1, vjust = -0.5, size = 3.5) +
-  labs(title = "NMDS — Bray-Curtis (16S)") +
+# ── ITS 
+
+
+# Calcular la matriz de distancias (OBLIGATORIO primero)
+dist_brayITS <- phyloseq::distance(psITS_rel, method = "bray")
+
+# Verificar dimensiones
+cat("Dimensiones Bray-Curtis:", attr(dist_brayITS, "Size"), "x",
+    attr(dist_brayITS, "Size"), "\n")
+
+# PCoA
+ord_brayITS <- ordinate(psITS_rel, method = "PCoA", distance = dist_brayITS)
+
+# Varianza explicada
+eigITS <- ord_brayITS$values$Eigenvalues
+varITS <- round(eigITS / sum(eigITS) * 100, 1)
+cat("Eje 1:", varITS[1], "% | Eje 2:", varITS[2], "%\n")
+
+# Gráfico
+pcoa_16S <- plot_ordination(psITS_rel, ord_brayITS) +
+  geom_point(size = 4, alpha = 0.9, color = "#4daf4a") +
+  labs(title = "PCoA — Bray-Curtis (ITS)",
+       x = paste0("PCoA1 [", varITS[1], "%]"),
+       y = paste0("PCoA2 [", varITS[2], "%]")) +
   theme_bw(base_size = 12)
 
+ggsave("03_Results/figures/ITS/pcoa-ITS.png",
+       plot   = pcoa_ITS,
+       width  = 8,
+       height = 6,
+       dpi    = 300)
 
-# ------------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
+
 # 6.  VISUALIZACIONES
-# ------------------------------------------------------------------------------
 
-# ==== 6a.  Gráfico de barras taxonómico ====
+
+# Gráfico de barras taxonómico
 
 # tax_glom() aglomera todos los ASVs que comparten la misma asignación a nivel
 # de Filo, sumando sus conteos. NArm = TRUE elimina ASVs sin asignación de Filo.
@@ -592,7 +627,7 @@ ggplot(df_bar16S, aes(x = Sample, y = Abundance, fill = Phylum)) +
         legend.key.size = unit(0.4, "cm"))
 
 
-# ==== 6b.  Mapa de calor taxonómico ====
+# Mapa de calor taxonómico
 
 # Se seleccionan los 30 ASVs con mayor abundancia relativa total.
 top30_16S   <- names(sort(taxa_sums(ps16S_rel), decreasing = TRUE))[1:30]
@@ -610,11 +645,11 @@ plot_heatmap(ps16S_top30, method = "NMDS", distance = "bray",
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 
-# ------------------------------------------------------------------------------
-# 7.  ANÁLISIS ESTADÍSTICOS
-# ------------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
 
-# ==== 7a.  PERMANOVA ====
+# 7.  ANÁLISIS ESTADÍSTICOS
+
+
 # PERMANOVA (vegan::adonis2) prueba si la composición microbiana difiere
 # significativamente entre grupos definidos por una variable de metadatos.
 # Particiona una matriz de distancias en componentes dentro y entre grupos,
@@ -644,84 +679,6 @@ perm16S <- vegan::adonis2(
 print(perm16S)
 
 
-# ==== 7b.  Kruskal-Wallis sobre índice Shannon ====
-# Prueba no paramétrica de una vía: verifica si la diversidad Shannon difiere
-# entre niveles de una variable de agrupación sin asumir normalidad.
-
-# Se adjunta la variable 'Run' de sample_data a la tabla de diversidad alfa.
-# Esto vincula cada valor alfa con el grupo de metadatos correspondiente.
-alpha16S$Run <- sample_data(ps16S_rare)$Run
-
-# kruskal.test() requiere una fórmula y el data.frame que contiene ambas variables.
-kw16S <- kruskal.test(Shannon ~ Run, data = alpha16S)
-cat("=== Kruskal-Wallis: Shannon (16S) ===\n")
-print(kw16S)
-
-# Si p < 0.05 puedes realizar comparaciones por pares con Wilcoxon
-# (pairwise.wilcox.test con p.adjust.method = "BH") para identificar qué
-# grupos difieren — consulta el tutorial phyloseq2 para un ejemplo completo.
-
-
-# ==== 7c.  Abundancia diferencial (DESeq2) ====
-# DESeq2 modela los conteos crudos con una distribución binomial negativa y
-# prueba si cada ASV es significativamente más o menos abundante entre dos grupos.
-# Este bloque está envuelto en requireNamespace() para que el script se ejecute
-# incluso si DESeq2 no está instalado.
-
-if (requireNamespace("DESeq2", quietly = TRUE)) {
-  library(DESeq2)
-
-  # USO: descomenta y adapta las líneas siguientes a tu diseño experimental.
-  # Sustituye 'grupo' por tu columna de agrupación real, y "GrupoA"/"GrupoB"
-  # por los niveles que quieres comparar.
-
-  # ps_sub16S <- subset_samples(ps16S, grupo %in% c("GrupoA", "GrupoB"))
-  # ps_sub16S <- prune_taxa(taxa_sums(ps_sub16S) > 5, ps_sub16S)
-  #
-  # phyloseq_to_deseq2() convierte el objeto phyloseq en un DESeqDataSet.
-  # La fórmula de diseño ~ grupo indica a DESeq2 qué variable probar.
-  # dds16S    <- phyloseq_to_deseq2(ps_sub16S, ~ grupo)
-  #
-  # estimateSizeFactors con type = "poscounts" maneja mejor los datos de
-  # microbioma con muchos ceros que el enfoque de media geométrica por defecto.
-  # dds16S    <- DESeq2::estimateSizeFactors(dds16S, type = "poscounts")
-  #
-  # DESeq() ajusta el modelo binomial negativo y realiza pruebas de Wald.
-  # fitType = "mean" es un estimador de dispersión simple adecuado para datos
-  # dispersos.
-  # dds16S    <- DESeq2::DESeq(dds16S, fitType = "mean", quiet = TRUE)
-  #
-  # results() extrae fold changes y p-valores; cooksCutoff = FALSE conserva
-  # todos los resultados sin filtrar valores atípicos (recomendado para
-  # datos de microbioma).
-  # res16S    <- DESeq2::results(dds16S, cooksCutoff = FALSE)
-  #
-  # Se filtran los ASVs significativos: se eliminan filas donde padj es NA
-  # (no probado) y se conservan solo los con p-valor ajustado < 0.05 (FDR ≤ 5 %).
-  # res_sig16S <- res16S[which(!is.na(res16S$padj) & res16S$padj < 0.05), ]
-  # cat("ASVs diferencialmente abundantes (FDR < 5%):", nrow(res_sig16S), "\n")
-}
-
-
-# ------------------------------------------------------------------------------
-# 8.  EXPORTACIÓN DE RESULTADOS
-# ------------------------------------------------------------------------------
-
-# saveRDS() guarda los objetos phyloseq filtrados y transformados en disco.
-# Pueden recargarse en una nueva sesión de R con readRDS().
-saveRDS(ps16S_f,    "03_Results/rds/16S/ps16S_filtrado.RDS")
-saveRDS(ps16S_rel,  "03_Results/rds/16S/ps16S_rel.RDS")
-saveRDS(ps16S_rare, "03_Results/rds/16S/ps16S_rare.RDS")
-
-# write.csv() exporta cada tabla de datos como CSV de texto plano.
-# as.data.frame() es necesario porque otu_table y tax_table son objetos S4,
-# no data.frames estándar; write.csv() no puede manejarlos directamente.
-write.csv(as.data.frame(otu_table(ps16S_f)),   "03_Results/csv/16S/tabla_asv.csv")
-write.csv(as.data.frame(tax_table(ps16S_f)),   "03_Results/csv/16S/taxonomia.csv")
-write.csv(as.data.frame(sample_data(ps16S_f)), "03_Results/csv/16S/metadatos.csv")
-
-# alpha16S es un data.frame estándar, por lo que write.csv() funciona directamente.
-write.csv(alpha16S, "03_Results/csv/16S/diversidad_alfa.csv")
 
 # Uso de la IA: corrección de los errores no entendibles al ejecutar el código y ayuda en el
 # comentado para darle mejor estructura al texto (formato).

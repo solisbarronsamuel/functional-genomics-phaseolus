@@ -32,7 +32,7 @@ Los análisis de diversidad alfa y beta se realizarán en R utilizando el paquet
 
 ## 3. Resultados
 
-### Filtrdo por prevalencia y abundancia
+### Filtrado por prevalencia y abundancia
 
 Las muestras de los ASVs fueron seleccionadas mediante el umbral de 10 para excluir ruido de secuenciación y eliminaron las que están presentes menos del 5% de las muestras. Las muestras de los ASVs de 16S de 5450 nos quedamos con 3696, los ASVs de ITS de 6634 nos quedamos con 6433. Las muestras de 16S mediante la rarefacción de 16S es de 135 y el ASVs rarefación fue de 1754. Las muestras de ITS la rarefacción es de 134, y el ASVs rarefación fue de 74. Los resultados gráficos del total de lecturas por muestras son los siguientes:
 
@@ -51,7 +51,7 @@ knitr::include_graphics("../03_Results/figures/ITS/lecturas-ITS.png")
 
 La diversidad alfa del bacterioma indica el índice de Shannon que la mayoría de las muestras presenta diversidad. El InvSimpson resultó que no hay dominancia de especies.
 
-La diversidad alfa en el fungoma, el índice de Shannon la mayoría de las muestras tiene una diversidad moderada con uniformidad de muestras. El InvSimpson la mayoría de las muestras tiene una comunidad equitativa.
+La diversidad alfa en el fungoma, el índice de Shannon la mayoría de las muestras tienen una diversidad moderada con uniformidad de muestras. El InvSimpson la mayoría de las muestras tiene una comunidad equitativa.
 
 ```{r, echo=FALSE, out.width="60%"}
 # chunk at line 44–46
@@ -59,6 +59,16 @@ knitr::include_graphics("../03_Results/figures/16S/diversidad-alfa-16S.png")
 
 # chunk at line 48–50
 knitr::include_graphics("../03_Results/figures/ITS/diversidad-alfa-ITS.png")
+```
+
+El PCoA 16S la mayoría de las muestras, su comunidad es homogénea y la varianza explicada es del 28.3%. El PCoA ITS las muestras presentan una dispersión, reduciendo su homogeneidad entre las muestras y la varianza explicada fue de 29.2%.
+
+```{r, echo=FALSE, out.width="60%"}
+# chunk at line 44–46
+knitr::include_graphics("../03_Results/figures/16S/pcoa-16S.png")
+
+# chunk at line 48–50
+knitr::include_graphics("../03_Results/figures/ITS/pcoa-ITS.png")
 ```
 
 
