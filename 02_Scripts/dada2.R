@@ -722,6 +722,11 @@ seqtab.nochimITS <- removeBimeraDenovo(seqtabITS, method = "consensus",
 cat("Fraccion de lecturas ITS conservadas:",
     round(sum(seqtab.nochimITS) / sum(seqtabITS), 4), "\n")
 
+saveRDS(seqtab.nochim16S, file = "03_Results/rds/16S/seqtab.nochim16S.RDS")
+seqtab.nochim16S <- readRDS("03_Results/rds/16S/seqtab.nochim16S")
+
+saveRDS(seqtab.nochimITS, file = "03_Results/rds/ITS/seqtab.nochimITS.RDS")
+seqtab.nochimITS <- readRDS("03_Results/rds/ITS/seqtab.nochimITS.RDS")
 
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -888,3 +893,6 @@ colnames(taxidITS) <- ranks
 rownames(taxidITS) <- getSequences(seqtab.nochimITS)
 
 saveRDS(taxidITS, file = "03_Results/rds/ITS/taxidITS_decipher.RDS")
+
+# Uso de la IA: corrección de los errores no entendibles al ejecutar el código y ayuda en el
+# comentado para darle mejor estructura al texto (formato).
