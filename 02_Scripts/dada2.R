@@ -1,54 +1,55 @@
+# ─────────────────────────────────────────────────────────────────────────────
 
 # PIPELINE DE ASV — 16S & 18S/ITS (DADA2)
 
 # ─────────────────────────────────────────────────────────────────────────────
+
 # 1. INSTALACIÓN DE PAQUETES
-# Ejecutar este bloque una sola vez.
-# En RMarkdown usar eval = FALSE para omitirlo en re-renderizados.
-# ─────────────────────────────────────────────────────────────────────────────
 
 # requireNamespace() comprueba si "BiocManager" ya está instalado sin cargarlo.
 # El operador ! niega el resultado, por lo que la condición es verdadera cuando
-# el paquete NO está disponible. En ese caso se instala desde CRAN.
-if (!requireNamespace("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
+# el paquete NO está disponible.
 # quietly = TRUE suprime mensajes de advertencia durante la comprobación.
+
+# if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
 
 # BiocManager::install(version = ...) actualiza o instala el núcleo de
 # Bioconductor a la versión indicada (3.23). Esto garantiza compatibilidad
 # entre todos los paquetes de Bioconductor que se usarán a continuación.
-BiocManager::install(version = "3.23")
+
+# BiocManager::install(version = "3.23")
 
 # BiocManager::install() con un vector de nombres instala varios paquetes
 # de Bioconductor de una sola vez:
-#   dada2      — pipeline principal de denoising de amplicones
-#   ShortRead  — lectura e inspección de archivos FASTQ
-#   Biostrings — manipulación de cadenas de ADN (complemento inverso, etc.)
-#   phyloseq   — análisis downstream de microbiomas
-#   DESeq2     — pruebas de abundancia diferencial
-#   DECIPHER   — asignación taxonómica con IdTaxa
+#   dada2      — pipeline principal de denoising de amplicones.
+#   ShortRead  — lectura e inspección de archivos FASTQ.
+#   Biostrings — manipulación de cadenas de ADN .
+#   phyloseq   — análisis y visualizar datos de metagenómica.
+#   DESeq2     — pruebas de abundancia diferencial.
+#   DECIPHER   — asignación taxonómica con IdTaxa.
 # force = TRUE fuerza la reinstalación aunque ya estén instalados.
-BiocManager::install(
-  c("dada2", "ShortRead", "Biostrings", "phyloseq", "DESeq2", "DECIPHER"),
-  force = TRUE
-)
+
+# BiocManager::install(
+#  c("dada2", "ShortRead", "Biostrings", "phyloseq", "DESeq2", "DECIPHER"),
+#  force = TRUE)
 
 # install.packages() instala paquetes del repositorio CRAN:
-#   ggplot2      — visualización de datos
-#   vegan        — métricas de diversidad ecológica
-#   scales       — transformaciones de ejes en gráficos
-#   RColorBrewer — paletas de colores categóricas
-#   ggpubr       — figuras listas para publicación basadas en ggplot2
-#   knitr        — generación de reportes reproducibles
-install.packages(c("ggplot2", "vegan", "scales",
-                   "RColorBrewer", "ggpubr", "knitr"))
+#   ggplot2      — visualización de datos.
+#   vegan        — métricas de diversidad ecológica.
+#   scales       — transformaciones de ejes en gráficos.
+#   RColorBrewer — paletas de colores categóricas.
+#   ggpubr       — figuras listas para publicación basadas en ggplot2.
+#   knitr        — generación de reportes reproducibles.
 
+# install.packages(c("ggplot2", "vegan", "scales",
+#                   "RColorBrewer", "ggpubr", "knitr"))
 
 # ─────────────────────────────────────────────────────────────────────────────
+
 # 2. CARGA DE PAQUETES
-# library() carga cada paquete instalado en la sesión activa de R,
-# haciendo disponibles todas sus funciones sin necesidad del prefijo paquete::
-# ─────────────────────────────────────────────────────────────────────────────
+
+# library() carga cada paquete instalado en la sesión activa de R.
 
 library(dada2)        # funciones del pipeline DADA2
 library(ShortRead)    # lectura/escritura de FASTQ
@@ -65,80 +66,95 @@ library(DECIPHER)     # clasificador IdTaxa
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3. METADATOS DE MUESTRAS (SRA RUN TABLES)
-# ─────────────────────────────────────────────────────────────────────────────
+
+# 3. METADATOS DE MUESTRAS
 
 # read.csv() lee un archivo de texto delimitado por comas y lo convierte en
-# un data.frame de R. La ruta apunta a la tabla de metadatos descargada del
-# NCBI SRA para el experimento de 16S (bacterioma).
-# stringsAsFactors = FALSE evita que R convierta automáticamente las columnas
+# un data.frame de R.
+# stringsAsFactors = FALSE evita que R convierta automáticamente las columnas.
 # de texto en factores, lo cual facilita la manipulación posterior como cadenas.
+
+# La ruta apunta a la tabla de metadatos descargada del
+# NCBI SRA para el experimento de 16S (bacterioma) e ITS (fungoma).
+
 metadata16S <- read.csv("01_RawData/csv/16S/SraRunTable16S.csv",
                         stringsAsFactors = FALSE)
 
-# Lo mismo para el experimento ITS/18S (micobioma).
 metadataITS <- read.csv("01_RawData/csv/ITS/SraRunTableITS.csv",
                         stringsAsFactors = FALSE)
 
-# El operador $ accede a una columna (o crea una nueva si no existe).
+# El operador $ accede a una columna.
 # Aquí se añade la columna "amplicon" a cada tabla con el valor correspondiente,
 # para poder distinguir el origen de cada muestra después de unir ambas tablas.
+
 metadata16S$amplicon <- "16S"
 metadataITS$amplicon <- "ITS"
 
 # rbind() ("row bind") apila dos data.frames uno encima del otro por filas,
 # combinando ambas tablas de metadatos en una sola. Las columnas deben coincidir.
 # Resultado: un único data.frame con todas las muestras de ambos amplicones.
+
 metadata <- rbind(metadata16S, metadataITS)
 
 # cat() imprime texto en la consola concatenando sus argumentos.
 # sum(metadata$amplicon == "16S") cuenta cuántas filas tienen el valor "16S"
 # en la columna amplicon (TRUE cuenta como 1, FALSE como 0).
 # \n es el carácter de nueva línea.
+
 cat("Muestras 16S:", sum(metadata$amplicon == "16S"), "\n")
 cat("Muestras ITS:", sum(metadata$amplicon == "ITS"),  "\n")
 
 # head() muestra las primeras 6 filas del data.frame en la consola.
 # Sirve como verificación rápida de que la unión fue correcta.
+
 head(metadata)
 
-# write.csv() exporta el data.frame combinado como archivo CSV en disco,
-# creando un registro permanente de los metadatos para el análisis.
+# write.csv() exporta el data.frame combinado como archivo CSV en el directorio
+
 write.csv(metadata, "03_Results/csv/metadata/metadata.csv")
 
 # Indexación lógica: metadata$Run devuelve el vector de accesiones SRR,
 # y el corchete [] lo filtra conservando solo las que pertenecen al amplicón 16S.
 # Este vector se usará para localizar los archivos FASTQ correspondientes.
-srr <- metadata$Run[metadata$amplicon == "16S"]
 
+srr16S <- metadata$Run[metadata$amplicon == "16S"]
+srrITS <- metadata$Run[metadata$amplicon == "ITS"]
 
 # ─────────────────────────────────────────────────────────────────────────────
+
 # 4. RUTAS A LOS ARCHIVOS FASTQ
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 # Se define la ruta raíz donde están los FASTQ crudos del 16S como cadena de texto.
+
 path16S <- "01_RawData/fastq/16S/"
+
 # list.files() lista todos los archivos en ese directorio: verificación de que
 # la ruta existe y contiene los archivos esperados antes de continuar.
+
 list.files(path16S)
 
 # Lo mismo para ITS/18S.
+
 pathITS <- "01_RawData/fastq/ITS/"
+
 list.files(pathITS)
 
 # list.files() con pattern = "_1.fastq" selecciona solo los archivos de lecturas
-# forward (R1). full.names = TRUE devuelve la ruta completa, no solo el nombre.
+# forward (R1). 
+# full.names = TRUE devuelve la ruta completa, no solo el nombre.
 # sort() ordena alfabéticamente para garantizar que los pares R1/R2 queden
 # alineados en el mismo orden (muestra i de fnFs corresponde a muestra i de fnRs).
+
 fnFs16S <- sort(list.files(path16S, pattern = "_1.fastq", full.names = TRUE))
 fnRs16S <- sort(list.files(path16S, pattern = "_2.fastq", full.names = TRUE))
 
-# Mismo procedimiento para las lecturas ITS/18S.
 fnFsITS <- sort(list.files(pathITS, pattern = "_1.fastq", full.names = TRUE))
 fnRsITS <- sort(list.files(pathITS, pattern = "_2.fastq", full.names = TRUE))
 
 # Vector de caracteres con los IDs SRR de las muestras control/parentales
 # que deben excluirse del análisis para evitar sesgo.
+
 remove_ids <- c(
   "SRR25070675",   # control / parental 16S
   "SRR25070676",   # control / parental 16S
