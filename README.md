@@ -1,8 +1,4 @@
----
-title: "Cambios en el bacterioma de la rizosfera asociados a bacterias fijadoras de nitrógeno en Phaseolus vulgaris*"
-author: "Samuel Solís Barrón"
-date: "`r Sys.Date()`"
----
+# Cambios en el bacterioma de la rizosfera asociados a bacterias fijadoras de nitrógeno en *Phaseolus vulgaris*
 
 Samuel Solís Barrón
 
